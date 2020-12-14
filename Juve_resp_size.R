@@ -31,23 +31,13 @@ library(growthrates)
 #Edmunds 2011: Density of larva is slightly above that of seawater (Spencer Davies, 1989), density of tropical seawater (and larva) ~1.023 mg/mm^3 or ~1023 micrograms/mm^3
 #(Henry and Torres 2013): Flabellum impensum (avg): tissue weight was 20% of total buoyant weight
 
-
-resp <-read_excel("Data/juve_resp_biomass.xlsx",sheet="Respiration")
-str(resp)
-
-setwd("/Users/nina/Projects/Moorea Oct 2020/Juveniles")
-biomass <-read_excel("Juve_Resp_Biomass.xlsx",sheet="Biomass")
-str(biomass)
-
-setwd("/Users/nina/Projects/Moorea Oct 2020/Juveniles")
-info <-read_excel("Juve_Resp_Biomass.xlsx",sheet="Temp_oxygen")
-str(info)
-
-setwd("/Users/nina/Projects/Moorea Oct 2020/Larvae")
-resp <-read_excel("Respiration_size_2020.xlsm",sheet="Respiration")
-str(resp)
+resp <-read_excel("Data/Juveniles/Data/Juve_resp_size_2020.xlsx",sheet="Respiration")
+biomass <-read_excel("Data/Juveniles/Data/Juve_resp_size_2020.xlsx",sheet="Biomass")
+info <-read_excel("Data/Juveniles/Data/Juve_resp_size_2020.xlsx",sheet="Temp_oxygen")
 
 resp$ID <- as.factor(resp$ID)
+biomass$ID <- as.factor(biomass$ID)
+info$ID <- as.factor(info$ID)
 
 #taking out the first 3 minutes of C2 and joining it back to the main dataset
 control2 <- resp%>%
@@ -70,20 +60,17 @@ Master <- combined%>%
   mutate(micromol.coral = micromol.mL*volume)
 
 #grouping the data based on trial
-Slopes <- Master%>%
-  group_by(ID, Species,Max, Min, Height, Date)%>%
-  do(fit=lm(micromol.coral ~ Elapsed_time_min, data= .)) 
+by_ID <- 
+  group_by(Master, ID, Species,Max, Min, Height, Date)
 
 #deriving the slope for each run
-Regression <- Slopes%>% 
-  tidy(fit)%>%
-  filter(term == "Elapsed_time_min") %>%
+Regression <- do(by_ID,tidy(lm(micromol.coral ~ Elapsed_time_min, data = .)))%>%
+  filter(term == "Elapsed_time_min")%>%
   select(-term)%>%
   mutate(estimate=(estimate*-1)) #estimate is percent of oxygen every 10 sec, 
-                                 #to make oxygen psitive
-#Getting the R2 value
-R2 <- Slopes %>% 
-  glance(fit)
+                                 #to make oxygen positive
+
+R2 <- do(by_ID,glance(lm(micromol.coral ~ Elapsed_time_min, data = .)))
 
 #combining data so I have the slope and R2
 Master_Slopes <- merge(Regression, R2, by="ID")%>%
@@ -128,7 +115,7 @@ Porites <- MASTER%>%
   filter(Species=="Porites")%>%
   mutate(Diameter=rowMeans(cbind(Max,Min), na.rm=T))%>%
   mutate(SA.shape.cm2=(2*3.14*((Diameter/2)/10)*(Height/10)))%>% #assuming a dome shape
-  mutate(SA=SA.shape.cm2*1.6199) #converting estimated SA based on shape to actual using dip
+  mutate(SA.cm2=SA.shape.cm2*1.6199) #converting estimated SA based on shape to actual using dip
                                  #dip 1.6199 cm2 = estimated 1 cm2
   #filter(ID!="20")
 
@@ -155,14 +142,14 @@ summary(Porites_model)
 
 
 #SA, Dry_weight
-ggplot(Porites,aes(x=log10(SA), y=log10(Dry_weight.g*1000)))+
+ggplot(Porites,aes(x=log10(SA.cm2), y=log10(Dry_weight.g*1000)))+
   geom_point(size=2, stroke=1, alpha = 1)+
   theme(legend.position="right")+
   labs(x=(expression(paste("Log Surface Area ", (mm^2)))), y="Log Dry Weight (mg)")+
   theme_classic(base_size=12)+
   geom_smooth(method="lm", color="black", size=0.5)
 
-Porites_dry <-  lm(log10(Dry_weight.g*1000)~log10(SA), data=Porites)
+Porites_dry <-  lm(log10(Dry_weight.g*1000)~log10(SA.cm2), data=Porites)
 summary(Porites_dry)
 
 #Porites, dry: adj R2:0.9233, p = 6.087e-06, 
@@ -173,7 +160,7 @@ Pocillopora <- MASTER%>%
   filter(Species=="Pocillopora")%>%
   mutate(Diameter=rowMeans(cbind(Max,Min), na.rm=T))%>%
   mutate(SA.shape.cm2=(2*3.14*(Height/10)*(((Diameter/2)/10))))%>%
-  mutate(SA=SA.shape.cm2*2.9009) #2.9009 wax dip cm2 = 1 estimate cm2
+  mutate(SA.cm2=SA.shape.cm2*2.9009) #2.9009 wax dip cm2 = 1 estimate cm2
 
 #LOG LOG
 ggplot(Pocillopora,aes(x=log10(Dry_weight.g*1000), y=log10(micromol.coral.min*60)))+
@@ -197,29 +184,27 @@ summary(Pocillopora_model)
 #0.90-1.1
 
 #SA, Dry_weight
-ggplot(Pocillopora, aes(x=log10(SA), y=log10(Dry_weight.g*1000)))+
+ggplot(Pocillopora, aes(x=log10(SA.cm2), y=log10(Dry_weight.g*1000)))+
   geom_point(size=2, stroke=1, alpha = 1)+
   theme(legend.position="right")+
   labs(x=(expression(paste("Log Surface Area ", (mm^2)))), y="Log Dry Weight (mg)")+
   theme_classic(base_size=12)+
   geom_smooth(method="lm", color="black", size=0.5)
 
-Pocillopora_dry <-  lm(log10(Dry_weight.g*1000)~log10(SA), data=Pocillopora)
+Pocillopora_dry <-  lm(log10(Dry_weight.g*1000)~log10(SA.cm2), data=Pocillopora)
 summary(Pocillopora_dry)
 
 #Pocillopora, dry: adj R2:0.9134, p <0.001, 
 #y=1.1226  (+-0.1088)x-0.4540
 
 ################### CONSOLIDATED ########################################
-
+#I need to consolidate because I got the surface area seperately
 Consolidated <- rbind(Pocillopora, Porites)%>%
-  mutate(Dry_weight.mg=Dry_weight.g*1000)%>%
-  mutate(log.Dry_weight.mg=log10(Dry_weight.mg))%>% ###
-  mutate(micromol.coral.hr=micromol.coral.min*60)%>%
-  mutate(log.micromol.coral.hr=log10(micromol.coral.hr)) ###
-  
+  select(-Diameter,-SA.shape.cm2)
 
-ggplot(Consolidated,aes(x=log.Dry_weight.mg, y=log.micromol.coral.hr, group =Species))+
+#write_xlsx(list(data=Consolidated),"Data/Juveniles/Data/R_juve_resp_size.xlsx")
+
+ggplot(Consolidated,aes(x=log10(Dry_weight.g*1000), y=log10(micromol.coral.min*60), group =Species))+
   geom_point(aes(color = Species), size=2, stroke=1, alpha = 1)+
   scale_color_manual(values=c("#F8A42F", "#FF4605"))+ 
                      #labels = c((expression(paste(italic("Pocillopora spp.")))), 
@@ -227,7 +212,7 @@ ggplot(Consolidated,aes(x=log.Dry_weight.mg, y=log.micromol.coral.hr, group =Spe
   theme(legend.position="right")+
   labs(x="Log Dry Tissue (mg)",y=(expression(paste("Log Respiration (", mu , "mol", " ", O[2], " ", coral^-1, " ", h^-1,")"))))+
   theme_classic(base_size=12)+
-  geom_smooth(method="lm", color="black", size=0.5)+
+  geom_smooth(method="lm", color="black", size=0.5)
   annotate("text", x=0.9, y=1.1, size=5, colour="#bf9000", label= (expression(paste("y=0.99x-0.47"))))+
   annotate("text", x=0.9, y=1, size=5, colour="#bf9000", label= (expression(paste(r^2, "=0.92"))))+
   annotate("text", x=1.5, y=0.1, size=5, colour="#FF4605", label= (expression(paste("y=0.65x-0.33"))))+
@@ -237,13 +222,13 @@ ggplot(Consolidated,aes(x=log.Dry_weight.mg, y=log.micromol.coral.hr, group =Spe
 #Porites: y= 0.65493(+- 0.09477)x, Overlaps with 0.75
 
 #SA, Dry_weight
-ggplot(Consolidated, aes(x=log10(SA), y=log.Dry_weight.mg, group = Species))+
+ggplot(Consolidated, aes(x=log10(SA.cm2), y=log10(Dry_weight.g*1000), group = Species))+
   geom_point(aes(color = Species), size=2, stroke=1, alpha = 1)+
   scale_color_manual(values=c("#F8A42F", "#FF4605"))+
   theme(legend.position="right")+
   labs(x=(expression(paste("Log Surface Area ", (cm^2)))), y="Log Dry Tissue (mg)")+
   theme_classic(base_size=12)+
-  geom_smooth(method="lm", color="black", size=0.5)+
+  geom_smooth(method="lm", color="black", size=0.5)
   annotate("text", x=1.7, y=0.8, size=5, colour="#bf9000", label= (expression(paste("y=1.12x-0.45"))))+ #Pocillopora
   annotate("text", x=1.7, y=0.7, size=5, colour="#bf9000", label= (expression(paste(r^2, "=0.91"))))+ #Pocillopora
   annotate("text", x=0.8, y=1.8, size=5, colour="#FF4605", label= (expression(paste("y=1.50x-0.25"))))+ #Porites
