@@ -1,0 +1,313 @@
+---
+title: "respiration_age"
+author: "Nina Bean"
+date: "6/10/2020"
+output: html_document
+---
+
+```{R include = FALSE}
+library(popbio)
+library(readxl)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(forcats) 
+library(lme4)
+library(writexl) #write_xlsx(list(Sheet1=df1,Sheet2=df2),"mydata.xlsx")
+library(stringr)
+library(metafor)
+library(car)
+library(nortest)
+library(GAD)
+library(AICcmodavg) #load AICcmodavg package
+library(DescTools) #winsorizing
+library(robustHD) #winsorizing
+library(MASS)
+library(survival)
+library(RColorBrewer)
+library(patchwork)
+library(rmarkdown)
+
+setwd("/Users/nina/Research/Research Ideas/AA Larval Energy Budget")
+meta <-read_excel("Meta_analysis.xlsx",sheet="Repiration.Photosynthesis") #to read your file
+
+str(meta)
+
+cols_to_be_rectified <- names(meta)[vapply(meta, is.character, logical(1))] #To get rid of spaces before and after
+meta[,cols_to_be_rectified] <- lapply(meta[,cols_to_be_rectified], trimws)
+
+meta$Study <- as.factor(meta$Study)
+meta$Species <- as.factor(meta$Species)
+meta$Respiration_OG <- as.numeric(meta$Respiration_OG)
+meta$Reproduction_mode <- as.factor(meta$Reproduction_mode)
+
+
+#Renaming for simplification
+#Making SD column
+meta <- meta%>%
+  dplyr::rename(Respiration="Respiration_nmolO2larvmin")%>%
+  dplyr::rename(Age="Days_post_release_fertilization")%>%
+  mutate(Respiration=Respiration*1000)%>%
+  mutate(Respiration_SE=Respiration_SE*1000) #making nmolO2/larva -> pikomols
+
+str(meta)
+
+meta <- meta%>%
+  dplyr::select(Study, Source_resp, Source_biomass, Ocean, Location, Family, Species, 
+                Reproduction_mode, Life_stage, 
+                n_resp, Season, Age, n_biomass, 
+                Energy_method, Lipid_microg.larva_dry, Protein_microg.larva_dry, Biomass_microg.larva_wet,
+                Biomass_microg.larva_dry, Biomass_SE_dry, Biomass_assumptions, 
+                OA_type, Temp_type, Treatment_Temp,
+                Respiration_OG, Respiration_OG_SE, Respiration_OG_units, Respiration_conversion_assumptions,
+                Respiration, Respiration_SE, Notes)%>% #Area was used to possibly include for biomass estimates
+  dplyr::filter(Life_stage=="larvae")%>% #Excludes the first few days in Graham et al 2013 b/c they were eggs/embryos
+  dplyr::filter(OA_type=="ambient")%>%
+  dplyr::filter(Temp_type=="ambient")%>% #Not lookint at OA
+  dplyr::select(-OA_type,-Temp_type, -Life_stage)
+#Just larvae under ambient seawater chemistry and temperatures
+
+
+#Taking the lower number of replicates
+#In the study, ___, if the n_resp column says ___, change it to <-____
+meta["n_resp"][meta["Study"]=="Edmunds 2013"&meta["n_resp"]=="4-6"] <- "4" 
+meta["n_resp"][meta["Study"]=="Serrano et al 2018"&meta["n_resp"]=="8-10"] <- "8"
+meta["n_resp"][meta["Study"]=="Edmunds et al 2011"&meta["n_resp"]=="3-4"] <- "3"
+meta["n_resp"][meta["Study"]=="Edmunds et al 2011"&meta["n_resp"]=="5-6"] <- "5"
+
+meta$n_resp <- as.numeric(meta$n_resp) #Making respiration numeric
+
+meta["Treatment_Temp"][meta["Study"]=="Edmunds et al 2011"&meta["Treatment_Temp"]==26.40] <- 26.7
+meta["Treatment_Temp"][meta["Study"]=="Edmunds et al 2011"&meta["Treatment_Temp"]==27.00] <- 26.7
+#Because I want to keep treatment temp as a column and each species was exposed to an 
+#Average of 26.7C 
+
+#meta$Treatment_Temp <- round(as.numeric(meta$Treatment_Temp)) #Rounding temperature
+
+meta1 <- meta%>% 
+  mutate("Respiration_SD"= (Respiration_SE * sqrt(n_resp)))%>%
+  mutate("Respiration_var"= (Respiration_SD)^2)%>%
+  mutate("Respiration_SS"= (Respiration_var)*(n_resp-1))%>% #For sample variance, SS, stdev
+  mutate("Inverse_var"=(1/Respiration_var))
+  
+str(meta1)
+
+#Taking out studies with days post release not given, or variable
+#Or respiration not given
+
+age1 <- meta1%>%
+  filter(!Study %in% c("Haryanti and Hidaka 2015", #Haryanti & Hidaka 2015: Days post release is variable
+                       "Richmond 1987",            #Richmond 1987: Days post release is not given
+                       "Edmunds et al 2001"))%>%   #Edmunds 2001 is removed because in one group, larvae were 2 days old
+                                                    #In another group, they were 1-2 days old. I don't have a 1 day old data point alone     
+  filter(Respiration!="NA")%>% #Taking out studies with missing respiration
+  filter(!Respiration<0) #Taking out negative respiration rates beause graph couldn't resolve them. Graham et al 2013: Age 15 & 24
+
+#respiration missing becase
+#Edmunds 2001: Not taken, settlement was
+#Harii 2010 & Graham et al 2013: Not taken, lipid, weight was
+#Serrano 2018: Not taken, settlement and survivorship was
+
+#Making days post release  into integers, rounding everything down
+age1$Age <- floor(as.numeric(age1$Age))
+#NA introduced because Edmunds et al 2001 had 1-2 day old larvae. 
+#I won't use that data so NA is good
+
+#Taking the average within studies, pooling day of release
+str(age1)
+#age is just the data points without any summarizing right now...
+
+####### rawage is the raw data
+#Didn't include: n_biomass, Biomass_microg.larva_wet, Biomass_SE_dry
+
+col_order <- c("Study", "Source_resp", "Source_biomass", "Ocean", "Location", "Season", "Family", "Species", 
+  "Reproduction_mode", "Age", "Treatment_Temp", 
+  "Energy_method", "Lipid_microg.larva_dry", "Protein_microg.larva_dry",
+  "Biomass_microg.larva_dry", "Biomass_assumptions", "n_resp" , "Respiration_OG", 
+  "Respiration_OG_SE", "Respiration_OG_units",
+  "Respiration_conversion_assumptions", "Respiration", "Respiration_SE", "Respiration_SD",
+  "Respiration_var", "Inverse_var","Respiration_SS", "Notes")
+rawage <- age1[, col_order]
+####### rawage is the raw data
+ageavg <- rawage
+
+ageavg["Source_resp"][ageavg["Study"]=="Cumbo et al 2012"&ageavg["Source_resp"]=="Fig. 1"] <- "Fig. 1 & 3"
+ageavg["Source_resp"][ageavg["Study"]=="Cumbo et al 2012"&ageavg["Source_resp"]=="Fig. 3"] <- "Fig. 1 & 3"
+ageavg["Source_biomass"][ageavg["Study"]=="Cumbo et al 2012"&ageavg["Source_biomass"]=="Fig. 1"] <- "Fig. 1 & 3"
+ageavg["Source_biomass"][ageavg["Study"]=="Cumbo et al 2012"&ageavg["Source_biomass"]=="Fig. 3"] <- "Fig. 1 & 3"
+
+ageavg$n_resp <- as.character(ageavg$n_resp)
+
+ageavg["n_resp"][ageavg["Study"]=="Cumbo et al 2013"&ageavg["n_resp"]=="2"] <- "2-4"
+ageavg["n_resp"][ageavg["Study"]=="Cumbo et al 2013"&ageavg["n_resp"]=="4"] <- "2-4"
+
+
+#This assumption is true, but won't collapse anyways..
+#Cumbo 2012, Average from study isn't used anywayas because it is taken out later down below
+ageavg["Biomass_assumptions"][ageavg["Study"]=="Cumbo et al 2012"&ageavg["Biomass_assumptions"]=="Average from study"] <- "(Richmond 1987) P. damicornis: 17% protein of total dry weight"
+ageavg["Biomass_assumptions"][ageavg["Study"]=="Cumbo et al 2012"&ageavg["Biomass_assumptions"]=="Repeated last value taken"] <- "(Richmond 1987) P. damicornis: 17% protein of total dry weight"
+ageavg["Biomass_assumptions"][ageavg["Study"]=="Harii et al 2010"&ageavg["Biomass_assumptions"]=="Average from study"] <- "(Harii et al. 2007) & (Arai et al 1993): four broadcast species: 64% lipids of total dry weight"
+
+#Need to definitely group by study, age, and species
+#didn't group by n_resp, so Cumbo et al 2013 had two different n_resp that got merged
+str(ageavg)
+
+ageavg1 <- ageavg%>%
+  group_by(Study, Source_resp, Source_biomass, Ocean, Location, Season, Family, Species, 
+           Reproduction_mode, 
+           Age, Treatment_Temp, 
+           Energy_method, Biomass_assumptions,
+           Respiration_OG_units, Respiration_conversion_assumptions, Notes, n_resp
+           )%>%
+  dplyr::summarize(Respiration=mean(Respiration), 
+                   Respiration_SD=mean(Respiration_SD),
+                   Respiration_SE=mean(Respiration_SE),
+                   Respiration_var=mean(Respiration_var),
+                   Respiration_SS=mean(Respiration_SS),
+                   Respiration_OG=mean(Respiration_OG),
+                   Respiration_OG_SE=mean(Respiration_OG_SE), 
+                   Inverse_var=mean(Inverse_var),
+                   Biomass_microg.larva_dry=mean(Biomass_microg.larva_dry, na.rm=TRUE),
+                   Protein_microg.larva_dry=mean(Protein_microg.larva_dry),
+                   Lipid_microg.larva_dry=mean(Lipid_microg.larva_dry))
+                   
+
+#test1 <- ageavg%>%
+#  group_by(Study,Species,Age)%>%
+# dplyr::summarize(Respiration=mean(Respiration))
+
+str(ageavg1)
+
+#Filtering out studies or parts of studies that did not look among days with one species
+ageavg2 <- ageavg1%>%
+  filter(!(Study == "Cumbo et al 2012" & Species == "Seriatopora caliendrum"))%>% #How to filter out the row with these conditions
+  filter(!Study %in% c("Cumbo et al 2013", 
+                       "Edmunds et al 2011",
+                       "Rivest and Hofmann 2014", 
+                       "Rodriguez-Lanetty et al 2009", 
+                       "Ross et al 2010", 
+                       "Ross et al 2013", 
+                       "Serrano et al 2018",
+                       "Edmunds and Wall 2014",
+                       "Putnam and Gates 2015",
+                       "Putnam et al 2013",
+                       "Titlyanov et al 1998",
+                       "Nakamura et al 2011"))
+
+#"Titlyanov et al 1998" <- The day 7->8 respiration was of a non swimming larva with an exoskeleton
+                                        #Then I don't have two points from this study
+#Nakamura study: orders of magnitude smaller resp rates. Probably wrong
+
+levels(ageavg2$Study) #This shows that the studies aren't really taken out
+ageavg2 <- droplevels(ageavg2) #Dropping levels for real
+
+justbiomass <- ageavg2%>%
+  ungroup(Study, Species, Age)%>%
+  mutate(normresp_nmolO2.microgramDW.min=(Respiration/Biomass_microg.larva_dry))%>%
+  mutate(normresp_SE=(Respiration_SE/Biomass_microg.larva_dry))%>%
+  mutate(normresp_Ivar=(Inverse_var/Biomass_microg.larva_dry))
+
+#Use justbiomass for stats
+
+table <- justbiomass
+
+table$Respiration <- round(as.numeric(table$Respiration), digits=1)
+table$Respiration_SE <- round(as.numeric(table$Respiration_SE), digits=1)
+table$Respiration_OG <- signif(as.numeric(table$Respiration_OG), digits=3)
+table$Respiration_OG_SE <- signif(as.numeric(table$Respiration_OG_SE), digits=3)
+
+str(table)
+
+#making assumptions letters
+table["Respiration_conversion_assumptions"][table["Study"]=="Cumbo et al 2013b"&table["Respiration_conversion_assumptions"]=="Using mg protein per larva from study measurements"] <- "A"
+table["Biomass_assumptions"][table["Biomass_assumptions"]=="(Richmond 1987) P. damicornis: 17% protein of total dry weight"] <- "B"
+table["Biomass_assumptions"][table["Biomass_assumptions"]=="(Harii et al. 2007) & (Richmond 1987): P. damicornis: 69.05% lipids of total dry weight"] <- "C"
+table["Biomass_assumptions"][table["Biomass_assumptions"]=="(Harii et al. 2007) & (Arai et al 1993): four broadcast species: 64% lipids of total dry weight"] <- "D"
+table["Biomass_assumptions"][table["Biomass_assumptions"]=="(Edmunds 2001): P. astreoides: protein = 3.55 micrograms & (Richmond 1987) P. damicornis: 17% protein of total dry weight"] <- "E"
+table["Biomass_assumptions"][table["Biomass_assumptions"]=="(Graham 2007): three Acropora species: 34 microgram dry weight"] <- "F"
+table["Biomass_assumptions"][table["Biomass_assumptions"]=="(Richmond 1987): P. damicornis (avg): 150 micrograms dry weight"] <- "G"
+
+#combining respiration +- and assumptions
+table <- table%>%
+  unite("Assumptions", Biomass_assumptions, Respiration_conversion_assumptions, sep=", ", na.rm=TRUE)%>%
+  unite("Respiration_OG", Respiration_OG, Respiration_OG_SE, sep="±", na.rm=TRUE)%>%
+  unite("Respiration", Respiration, Respiration_SE, sep="±", na.rm=TRUE)
+  
+str(table)
+
+#reordering
+col_order <- c("Study", "Source_resp", "Source_biomass", "Ocean", "Location", "Season", "Family", "Species", 
+               "Reproduction_mode", "Age", "Treatment_Temp", 
+               "Energy_method", "Lipid_microg.larva_dry", "Protein_microg.larva_dry",
+               "Biomass_microg.larva_dry", "n_resp", "Respiration_OG", "Respiration_OG_units",
+               "Respiration", "normresp_nmolO2.microgramDW.min","Assumptions",
+               "normresp_SE", "normresp_Ivar",
+               "Respiration_SD",
+               "Respiration_var", "Inverse_var","Respiration_SS", "Notes")
+table <- table[, col_order]
+
+str(table)
+
+#Didn't include: Ocean, Source_resp, Source_biomass, 
+#Reproduction_mode, Energy_method, Lipid_microg.larva_dry, Protein_microg.larva_dry, normresp_SE, 
+#Respiration_SD, Respiration_var, Inverse_var, Respiration_SS, Notes
+#normresp_Ivar
+#Notes only talk about Graham and how I took points directly off graph 
+
+#Just picking values I want for my table
+table <- table%>%
+  dplyr::select(Study, Location, Season, Family, Species,
+                Age, Treatment_Temp, Reproduction_mode,
+                Biomass_microg.larva_dry, n_resp, Respiration_OG, Respiration_OG_units,
+                Respiration, normresp_nmolO2.microgramDW.min, Assumptions)
+
+table_broodingbio <- table %>%
+  filter(Reproduction_mode=="brooding")%>%
+  dplyr::select(-Reproduction_mode)
+
+
+table_broadcastingbio <- table %>%
+  filter(Reproduction_mode=="broadcasting")%>%
+  dplyr::select(-Reproduction_mode)
+
+table <- table%>%
+  filter(Reproduction_mode=="broadcasting")
+  
+
+#write_xlsx(list(data=table,brooding=table_broodingbio,broadcasting=table_broadcastingbio,raw=rawage),"Publication_table.xlsx") 
+
+broadcastingbio <- justbiomass%>%
+  filter(Reproduction_mode=="broadcasting")%>%
+  dplyr::select(-Reproduction_mode)
+
+broodingbio <- justbiomass %>%
+  filter(Reproduction_mode=="brooding")%>%
+    dplyr::select(-Reproduction_mode)
+
+MTE <- justbiomass%>%
+  filter(!Study %in% c("Olsen et al 2013", 
+                       "Gaither and Rowan 2010", 
+                       "Albright and Langdon 2011"))%>%
+  group_by(Study, Species, Reproduction_mode)%>%
+  dplyr::summarize(normresp_nmolO2.microgramDW.min=mean(normresp_nmolO2.microgramDW.min), 
+                   Biomass_microg.larva_dry=mean(Biomass_microg.larva_dry))%>%
+  mutate(log_normresp = log10(normresp_nmolO2.microgramDW.min),
+         log_biomass = log10(Biomass_microg.larva_dry))
+
+
+```
+
+hellolklkn k;uglig test
+
+
+````{R echo = FALSE}
+ggplot(MTE,aes(x=log_biomass,y=log_normresp))+
+  geom_point(color="black")+
+  geom_smooth(method="lm")+
+  #geom_smooth(method = "lm", formula = y ~ poly(x, 2), se=FALSE, size=1, colour="light blue")+
+  labs(x="log Biomass (microgram/larva)",y="log normalized respiration (pikomol O2/microg DW/min)")+
+  theme_classic(base_size=12)
+````
+
+
