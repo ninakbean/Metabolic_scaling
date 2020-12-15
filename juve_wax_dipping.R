@@ -28,8 +28,7 @@ library(WRS2)
 library(lsmeans)
 library(growthrates)
 
-setwd("/Users/nina/Projects/Moorea Oct 2020/Juveniles")
-wax <-read_excel("Wax_dipping.xlsx",sheet="Master")
+wax <-read_excel("Data/Juveniles/Data/Juve_wax_dipping_2020.xlsx",sheet="Master")
 str(wax)
 
 ############ CONTROLS ##################################################
@@ -63,20 +62,28 @@ master <- wax%>%
 Porites <- master%>% 
   filter(Species=="Porites")%>%
   mutate(Diameter=rowMeans(cbind(max1.mm,max2.mm), na.rm=T))%>%
-  mutate(SA.shape.cm2=(2*3.14*(height.mm/10)*(((Diameter/2)/10)))) #same as pocillopora?
+  mutate(SA.shape.cm2.hemi=(2*3.14*(height.mm/10)*((max1.mm/2)/10)*((max2.mm/2)/10)))%>% #hemi-ellopsoid, R2:~0.89
+  mutate(SA.shape.cm2.dome=(2*3.14*(height.mm/10)*(((Diameter/2)/10)))) #dome, R2: ~0.84
 
+hemi <- lm(SA.dip2.cm2~SA.shape.cm2.hemi, data=Porites)
+dome <- lm(SA.dip2.cm2~SA.shape.cm2.dome, data=Porites)
+
+AIC(hemi, dome) #hemi is better
+  
 Port_dip1 <- Porites%>%
-  filter(weight.g!="NA") #Taking out samples where I fogot to get OG weight
-
+filter(weight.g!="NA") #Taking out samples where I forgot to get OG weight
+                         #not necessary for dip 2
 #Reduced data set: 1st dip
-Porites_model <-  lm(dip1_change~SA.shape.cm2, data=Port_dip1)
-summary(Porites_model)
+Porites_model.dip1 <-  lm(dip1_change~SA.shape.cm2.hemi, data=Port_dip1)
+summary(Porites_model.dip1)
 
 #Reduced data set: 2nd dip, higher R2 value
-Porites_model <-  lm(dip2_change~SA.shape.cm2, data=Port_dip1)
-summary(Porites_model)
+Porites_model.dip2 <-  lm(dip2_change~SA.shape.cm2.hemi, data=Port_dip1)
+summary(Porites_model.dip2)
 
-ggplot(Porites,aes(x=SA.shape.cm2, y=SA.dip2.cm2))+
+AIC(Porites_model.dip1, Porites_model.dip2) #very similar, within 1 point
+
+ggplot(Porites,aes(x=SA.shape.cm2.hemi, y=SA.dip2.cm2))+
   geom_point(size=2, stroke=1, alpha = 1)+
   #scale_shape_manual(values=c(2, 1))+
   #scale_color_manual(values=c("#F8A42F", "#FF4605", "#860111"))+
@@ -85,31 +92,40 @@ ggplot(Porites,aes(x=SA.shape.cm2, y=SA.dip2.cm2))+
   theme_classic(base_size=12)+
   geom_smooth(method="lm", color="black", size=0.5)
 
-Porites_model <-  lm(SA.dip2.cm2~SA.shape.cm2, data=Porites)
+Porites_model <-  lm(SA.dip2.cm2~SA.shape.cm2.hemi, data=Porites)
 summary(Porites_model)
 
-#y=1.6199x+1.1680 
-#dip 1.6199 cm2 = estimated 1 cm2
+#now: y=1.13x+4.74755
+#now: dip 1.13 cm2 = estimated 1 cm2
 
 ############ POCILLOPORA ##################################################
 
 Pocillopora <- master%>%
   filter(Species=="Pocillopora")%>%
   mutate(Diameter=rowMeans(cbind(max1.mm,max2.mm), na.rm=T))%>%
-  mutate(SA.shape.cm2=(2*3.14*(height.mm/10)*(((Diameter/2)/10))))
+  mutate(SA.shape.cm2.hemi=(2*3.14*(height.mm/10)*((max1.mm/2)/10)*((max2.mm/2)/10)))%>% #hemi-ellopsoid, R2:~0.945
+  mutate(SA.shape.cm2.dome=(2*3.14*(height.mm/10)*(((Diameter/2)/10)))) #dome, R2: ~0.93
+
+hemi <- lm(SA.dip2.cm2~SA.shape.cm2.hemi, data=Pocillopora)
+dome <- lm(SA.dip2.cm2~SA.shape.cm2.dome, data=Pocillopora)
+
+AIC(hemi,dome) #hemi is better
 
 Poc_dip1 <- Pocillopora%>%
   filter(weight.g!="NA") #Taking out samples where I fogot to get OG weight
 
 #Reduced data set: 1st dip
-Pocillopora_model <-  lm(dip1_change~SA.shape.cm2, data=Poc_dip1)
-summary(Pocillopora_model)
+Pocillopora_model.dip1 <-  lm(dip1_change~SA.shape.cm2.hemi, data=Poc_dip1)
+summary(Pocillopora_model.dip1)
 
 #Reduced data set: 2nd dip, higher R2 value
-Pocillopora_model <-  lm(dip2_change~SA.shape.cm2, data=Poc_dip1)
+Pocillopora_model.dip2 <-  lm(dip2_change~SA.shape.cm2.hemi, data=Poc_dip1)
 summary(Pocillopora_model)
 
-ggplot(Pocillopora,aes(x=SA.shape.cm2, y=SA.dip2.cm2))+
+AIC(Pocillopora_model.dip1, Pocillopora_model.dip2)
+#dip 2 is way better
+
+ggplot(Pocillopora,aes(x=SA.shape.cm2.hemi, y=SA.dip2.cm2))+
   geom_point(size=2, stroke=1, alpha = 1)+
   #scale_shape_manual(values=c(2, 1))+
   #scale_color_manual(values=c("#F8A42F", "#FF4605", "#860111"))+
@@ -119,8 +135,19 @@ ggplot(Pocillopora,aes(x=SA.shape.cm2, y=SA.dip2.cm2))+
   geom_smooth(method="lm", color="black", size=0.5)
 
 #All data
-Pocillopora_model <-  lm(SA.dip2.cm2~SA.shape.cm2, data=Pocillopora)
+Pocillopora_model <-  lm(SA.dip2.cm2~SA.shape.cm2.hemi, data=Pocillopora)
 summary(Pocillopora_model)
 
-#y=2.9009x-5.6441
-#2.9009 wax dip cm2 = 1 estimate cm2
+#Now: y=1.628x+5.18
+#Now: 1.628 wax dip cm2 = 1 estimate cm2
+
+consolidated <- rbind(Pocillopora, Porites)%>%
+  select(-Notebook_order, -ID, -Diameter, -dip1_change, -SA.shape.cm2.dome)
+
+#Notes
+#SA.dip2.cm2 (Surface area from change in wax weight)=weight of dip 2 in grams* calibration curve slope 
+#SA.shape.cm2.hemi (Surface area estimated from geometry assuming both corals are a
+#hemi-ellipsoid= (2*3.14*height*radius1*radius2)
+
+#write_xlsx(list(data=consolidated),"Data/Juveniles/Data/R_wax_dipping.xlsx")
+

@@ -58,7 +58,7 @@ Master <- combined%>%
 
 #grouping the data based on trial
 by_ID <- 
-  group_by(Master, ID, Species,Max, Min, Height, Date)
+  group_by(Master, ID, Species,Max.mm, Min.mm, Height.mm, Date.x)
 
 #deriving the slope for each run
 Regression <- do(by_ID,tidy(lm(micromol.coral ~ Elapsed_time_min, data = .)))%>%
@@ -72,12 +72,12 @@ R2 <- do(by_ID,glance(lm(micromol.coral ~ Elapsed_time_min, data = .)))
 #combining data so I have the slope and R2
 Master_Slopes <- merge(Regression, R2, by="ID")%>%
   rename(Species=Species.x)%>%
-  rename(Max=Max.x)%>%
-  rename(Min=Min.x)%>%
-  rename(Height=Height.x)%>%
-  rename(Date=Date.x)%>%
+  rename(Max.mm=Max.mm.x)%>%
+  rename(Min.mm=Min.mm.x)%>%
+  rename(Height.mm=Height.mm.x)%>%
+  rename(Date=Date.x.x)%>%
   rename(micromol.coral.min=estimate)%>%
-  select(Date, Species, ID, Max, Min, Height, micromol.coral.min, std.error, p.value.x, adj.r.squared)
+  select(Date, Species, ID, Max.mm, Min.mm, Height.mm, micromol.coral.min, std.error, p.value.x, adj.r.squared)
 
 #correcting all measurements on 11/09/2020 based on control slope
 nineth <- Master_Slopes%>%
@@ -108,16 +108,19 @@ MASTER <- merge(weight, Slopes_corrected, by="ID")
 #  geom_smooth(method="lm", color="black", size=0.5)
 
 ################### PORITES ########################################
+#assuming a hemi-ellipsoid= (2*3.14*height*radius1*radius2)
+#dip 1.13 cm2 = estimated 1 cm2
+
 Porites <- MASTER%>%  
   filter(Species=="Porites")%>%
-  mutate(Diameter=rowMeans(cbind(Max,Min), na.rm=T))%>%
-  mutate(SA.shape.cm2=(2*3.14*((Diameter/2)/10)*(Height/10)))%>% #assuming a dome shape
-  mutate(SA.cm2=SA.shape.cm2*1.6199) #converting estimated SA based on shape to actual using dip
-                                 #dip 1.6199 cm2 = estimated 1 cm2
+  mutate(Diameter=rowMeans(cbind(Max.mm,Min.mm), na.rm=T))%>%
+  mutate(SA.shape.cm2.hemi=(2*3.14*(Height.mm/10)*((Max.mm/2)/10)*((Min.mm/2)/10)))%>% #hemi-ellipsoid
+  mutate(SA.cm2.hemi=SA.shape.cm2.hemi*1.13) #converting estimated SA based on shape to actual using dip
+                                 
   #filter(ID!="20")
 
 #Log log
-ggplot(Porites,aes(x=log10(Dry_weight.g*1000), y=log10(micromol.coral.min*60), group =ID))+
+ggplot(Porites,aes(x=log10(Dry_weight.g*1000), y=log10(micromol.coral.min*60)))+
   geom_point(size=2, stroke=1, alpha = 1)+
   #scale_shape_manual(values=c(2, 1))+
   #scale_color_manual(values=c("#F8A42F", "#FF4605", "#860111"))+
@@ -139,25 +142,28 @@ summary(Porites_model)
 
 
 #SA, Dry_weight
-ggplot(Porites,aes(x=log10(SA.cm2), y=log10(Dry_weight.g*1000)))+
+ggplot(Porites,aes(x=log10(SA.cm2.hemi), y=log10(Dry_weight.g*1000)))+
   geom_point(size=2, stroke=1, alpha = 1)+
   theme(legend.position="right")+
   labs(x=(expression(paste("Log Surface Area ", (mm^2)))), y="Log Dry Weight (mg)")+
   theme_classic(base_size=12)+
   geom_smooth(method="lm", color="black", size=0.5)
 
-Porites_dry <-  lm(log10(Dry_weight.g*1000)~log10(SA.cm2), data=Porites)
+Porites_dry <-  lm(log10(Dry_weight.g*1000)~log10(SA.cm2.hemi), data=Porites)
 summary(Porites_dry)
 
 #Porites, dry: adj R2:0.9233, p = 6.087e-06, 
 #y= 1.4960(+-  0.1431)x -0.2595 
 
 ################### POCILLOPORA ########################################
+#assuming a hemi-ellipsoid= (2*3.14*height*radius1*radius2)
+#dip 1.63 cm2 = estimated 1 cm2
+
 Pocillopora <- MASTER%>%
   filter(Species=="Pocillopora")%>%
-  mutate(Diameter=rowMeans(cbind(Max,Min), na.rm=T))%>%
-  mutate(SA.shape.cm2=(2*3.14*(Height/10)*(((Diameter/2)/10))))%>%
-  mutate(SA.cm2=SA.shape.cm2*2.9009) #2.9009 wax dip cm2 = 1 estimate cm2
+  mutate(Diameter=rowMeans(cbind(Max.mm,Min.mm), na.rm=T))%>%
+  mutate(SA.shape.cm2.hemi=(2*3.14*(Height.mm/10)*((Max.mm/2)/10)*((Min.mm/2)/10)))%>% #hemi-ellipsoid
+  mutate(SA.cm2.hemi=SA.shape.cm2.hemi*1.63) #converting estimated SA based on shape to actual using dip
 
 #LOG LOG
 ggplot(Pocillopora,aes(x=log10(Dry_weight.g*1000), y=log10(micromol.coral.min*60)))+
@@ -181,25 +187,37 @@ summary(Pocillopora_model)
 #0.90-1.1
 
 #SA, Dry_weight
-ggplot(Pocillopora, aes(x=log10(SA.cm2), y=log10(Dry_weight.g*1000)))+
+ggplot(Pocillopora, aes(x=log10(SA.cm2.hemi), y=log10(Dry_weight.g*1000)))+
   geom_point(size=2, stroke=1, alpha = 1)+
   theme(legend.position="right")+
   labs(x=(expression(paste("Log Surface Area ", (mm^2)))), y="Log Dry Weight (mg)")+
   theme_classic(base_size=12)+
   geom_smooth(method="lm", color="black", size=0.5)
 
-Pocillopora_dry <-  lm(log10(Dry_weight.g*1000)~log10(SA.cm2), data=Pocillopora)
+Pocillopora_dry <-  lm(log10(Dry_weight.g*1000)~log10(SA.cm2.hemi), data=Pocillopora)
 summary(Pocillopora_dry)
 
 #Pocillopora, dry: adj R2:0.9134, p <0.001, 
 #y=1.1226  (+-0.1088)x-0.4540
 
 ################### CONSOLIDATED ########################################
-#I need to consolidate because I got the surface area seperately
+#I need to consolidate because I got the surface area separately
 Consolidated <- rbind(Pocillopora, Porites)%>%
-  select(-Diameter,-SA.shape.cm2)
+  select(-Diameter,-SA.shape.cm2.hemi)
 
 #write_xlsx(list(data=Consolidated),"Data/Juveniles/Data/R_juve_resp_size.xlsx")
+
+#NOTES
+#SA.cm2.hemi: Surface area of coral assuming the shape of a hemi-ellipsoid= (2*3.14*height*radius1*radius2)
+#and getting more accurate estimates by relating geometric surface area to wax dipped surface area from calibration curve. 
+#Collected corals on 11/08/2020
+#Preserved corals in 10% formalin for 48 hours
+#Decalcified corals in 5% HCL over multiple days
+#Delayed darkness from night of 11/08 (sunset 18:10)
+#Corals dark acclimated from 14 hrs 24 min - 53 hrs 37 min
+#Temp ~27C
+#Chamber 240 mL
+#Salinity 34 ppt
 
 ggplot(Consolidated,aes(x=log10(Dry_weight.g*1000), y=log10(micromol.coral.min*60), group =Species))+
   geom_point(aes(color = Species), size=2, stroke=1, alpha = 1)+
@@ -219,7 +237,7 @@ ggplot(Consolidated,aes(x=log10(Dry_weight.g*1000), y=log10(micromol.coral.min*6
 #Porites: y= 0.65493(+- 0.09477)x, Overlaps with 0.75
 
 #SA, Dry_weight
-ggplot(Consolidated, aes(x=log10(SA.cm2), y=log10(Dry_weight.g*1000), group = Species))+
+ggplot(Consolidated, aes(x=log10(SA.cm2.hemi), y=log10(Dry_weight.g*1000), group = Species))+
   geom_point(aes(color = Species), size=2, stroke=1, alpha = 1)+
   scale_color_manual(values=c("#F8A42F", "#FF4605"))+
   theme(legend.position="right")+

@@ -73,12 +73,15 @@ long_resp <- resp%>%
 
 larvae_data <- long_resp%>%
   select(ID, pikomol.larva.min, volume_mean.mm3, volume_se.mm3, log_resp, log_volume.mm3)
+#Notes
 #data excluding
 #Date: 10/26/2020
 #Temp: 26.7C
 #Genotype: E
 #Number of larvae: 6
 #Volume: 2 mL
+#larvae as spheroid (aka ellipsoid) = π/6*max length*max width^2 (Van Moorsel 1983)
+
 
 #write_xlsx(list(data=larvae_data),"Data/Larvae/R_larvae_resp_size.xlsx") 
 
