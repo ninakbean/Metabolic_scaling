@@ -28,9 +28,6 @@ library(WRS2)
 library(lsmeans)
 library(growthrates)
 
-#Edmunds 2011: Density of larva is slightly above that of seawater (Spencer Davies, 1989), density of tropical seawater (and larva) ~1.023 mg/mm^3 or ~1023 micrograms/mm^3
-#(Henry and Torres 2013): Flabellum impensum (avg): tissue weight was 20% of total buoyant weight
-
 resp <-read_excel("Data/Juveniles/Data/Juve_resp_size_2020.xlsx",sheet="Respiration")
 biomass <-read_excel("Data/Juveniles/Data/Juve_resp_size_2020.xlsx",sheet="Biomass")
 info <-read_excel("Data/Juveniles/Data/Juve_resp_size_2020.xlsx",sheet="Temp_oxygen")
