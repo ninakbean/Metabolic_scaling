@@ -152,8 +152,8 @@ ggplot(Porites,aes(x=log10(SA.cm2.hemi), y=log10(Dry_weight.g*1000)))+
 Porites_dry <-  lm(log10(Dry_weight.g*1000)~log10(SA.cm2.hemi), data=Porites)
 summary(Porites_dry)
 
-#Porites, dry: adj R2:0.9233, p = 6.087e-06, 
-#y= 1.4960(+-  0.1431)x -0.2595 
+#Porites, dry: adj R2:0.9255, p = 5.396e-06, 
+#y= 1.01264(+-  0.09532)x + 0.48072
 
 ################### POCILLOPORA ########################################
 #assuming a hemi-ellipsoid= (2*3.14*height*radius1*radius2)
@@ -197,8 +197,8 @@ ggplot(Pocillopora, aes(x=log10(SA.cm2.hemi), y=log10(Dry_weight.g*1000)))+
 Pocillopora_dry <-  lm(log10(Dry_weight.g*1000)~log10(SA.cm2.hemi), data=Pocillopora)
 summary(Pocillopora_dry)
 
-#Pocillopora, dry: adj R2:0.9134, p <0.001, 
-#y=1.1226  (+-0.1088)x-0.4540
+#Pocillopora, dry: adj R2:0.8951, p <0.001, 
+#y=0.7414 (+-0.07979)x+0.30990
 
 ################### CONSOLIDATED ########################################
 #I need to consolidate because I got the surface area separately
@@ -210,9 +210,9 @@ Consolidated <- rbind(Pocillopora, Porites)%>%
 #NOTES
 #SA.cm2.hemi: Surface area of coral assuming the shape of a hemi-ellipsoid= (2*3.14*height*radius1*radius2)
 #and getting more accurate estimates by relating geometric surface area to wax dipped surface area from calibration curve. 
-#Collected corals on 11/08/2020
+#Collected corals on 11/08/2020 at 8:10 am
 #Preserved corals in 10% formalin for 48 hours
-#Decalcified corals in 5% HCL over multiple days
+#Decalcified corals in 5% HCL over multiple days (1-7 days)
 #Delayed darkness from night of 11/08 (sunset 18:10)
 #Corals dark acclimated from 14 hrs 24 min - 53 hrs 37 min
 #Temp ~27C
@@ -243,22 +243,24 @@ ggplot(Consolidated, aes(x=log10(SA.cm2.hemi), y=log10(Dry_weight.g*1000), group
   theme(legend.position="right")+
   labs(x=(expression(paste("Log Surface Area ", (cm^2)))), y="Log Dry Tissue (mg)")+
   theme_classic(base_size=12)+
-  geom_smooth(method="lm", color="black", size=0.5)
-  annotate("text", x=1.7, y=0.8, size=5, colour="#bf9000", label= (expression(paste("y=1.12x-0.45"))))+ #Pocillopora
-  annotate("text", x=1.7, y=0.7, size=5, colour="#bf9000", label= (expression(paste(r^2, "=0.91"))))+ #Pocillopora
-  annotate("text", x=0.8, y=1.8, size=5, colour="#FF4605", label= (expression(paste("y=1.50x-0.25"))))+ #Porites
-  annotate("text", x=0.8, y=1.7, size=5, colour="#FF4605", label= (expression(paste(r^2, "=0.92")))) #Porites
- # geom_abline(intercept = 0, slope = 1, color="red", 
+  geom_smooth(method="lm", color="black", size=0.5)+
+  annotate("text", x=1.6, y=0.8, size=5, colour="#bf9000", 
+           label= "y=0.74x+0.31")+ #Pocillopora
+  annotate("text", x=1.6, y=0.7, size=5, colour="#bf9000", 
+           label= "R^{2}==0.90", parse=T)+ #Pocillopora
+  annotate("text", x=0.3, y=1.8, size=5, colour="#FF4605", 
+           label= "y=1.0x+0.48")+ #Porites
+  annotate("text", x=0.3, y=1.7, size=5, colour="#FF4605", 
+           label= "R^{2}==0.93", parse=T) #Porites
+# geom_abline(intercept = 0, slope = 1, color="red", 
 #              linetype="dashed", size=1.5)
+  
 
-#Pocillopora: p <0.001, y=0.8214 (+-0.0796)x+0.4916, adj R2:0.9134
-#Porites: p = 6.087e-06, y= 0.62286(+- 0.05958)x+0.23761, adj R2:0.9233
-
-#Pocillopora, dry: adj R2:0.9134, p <0.001, 
-#y=1.1226  (+-0.1088)x-0.4540
-
-#Porites, dry: adj R2:0.9233, p = 6.087e-06, 
-#y= 1.4960(+-  0.1431)x -0.2595 
+  #Pocillopora, dry: adj R2:0.8951, p <0.001, 
+  #y=0.7414 (+-0.07979)x+0.30990
+  
+  #Porites, dry: adj R2:0.9255, p = 5.396e-06, 
+  #y= 1.01264(+-  0.09532)x + 0.48072
 
 ################### RUNNING ANCOVA WITH SA AS COVARIATE##################
 #COMPARE SLOPES WITH ANCOVA

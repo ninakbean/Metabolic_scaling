@@ -88,9 +88,14 @@ ggplot(Porites,aes(x=SA.shape.cm2.hemi, y=SA.dip2.cm2))+
   #scale_shape_manual(values=c(2, 1))+
   #scale_color_manual(values=c("#F8A42F", "#FF4605", "#860111"))+
   theme(legend.position="right")+
-  labs(x="Geometric Shape SA (cm^2)",y="Wax Dip SA (cm^2)")+
+  labs(x=(expression(paste("Geometric Shape SA (", cm^2,")"))),
+       y=(expression(paste("Wax Dip SA (",cm^2,")"))))+
   theme_classic(base_size=12)+
-  geom_smooth(method="lm", color="black", size=0.5)
+  geom_smooth(method="lm", color="black", size=0.5)+
+  annotate("text", x=30, y=10, size=5, colour="black", 
+           label= "y=1.1x+4.75")+
+  annotate("text", x=30, y=6, size=5, colour="black",
+           label="R^{2}==0.90", parse=T)
 
 Porites_model <-  lm(SA.dip2.cm2~SA.shape.cm2.hemi, data=Porites)
 summary(Porites_model)
@@ -130,9 +135,14 @@ ggplot(Pocillopora,aes(x=SA.shape.cm2.hemi, y=SA.dip2.cm2))+
   #scale_shape_manual(values=c(2, 1))+
   #scale_color_manual(values=c("#F8A42F", "#FF4605", "#860111"))+
   theme(legend.position="right")+
-  labs(x="Geometric Shape SA (cm2)",y="Wax Dip SA (cm2)")+
+  labs(x=(expression(paste("Geometric Shape SA (", cm^2,")"))),
+       y=(expression(paste("Wax Dip SA (",cm^2,")"))))+
   theme_classic(base_size=12)+
-  geom_smooth(method="lm", color="black", size=0.5)
+  geom_smooth(method="lm", color="black", size=0.5)+
+  annotate("text", x=30, y=13, size=5, colour="black", 
+         label= "y=1.6x+5.2")+
+  annotate("text", x=30, y=6, size=5, colour="black",
+           label="R^{2}==0.95", parse=T)
 
 #All data
 Pocillopora_model <-  lm(SA.dip2.cm2~SA.shape.cm2.hemi, data=Pocillopora)
@@ -150,4 +160,22 @@ consolidated <- rbind(Pocillopora, Porites)%>%
 #hemi-ellipsoid= (2*3.14*height*radius1*radius2)
 
 #write_xlsx(list(data=consolidated),"Data/Juveniles/Data/R_wax_dipping.xlsx")
+
+ggplot(consolidated,aes(x=SA.shape.cm2.hemi, y=SA.dip2.cm2, group=Species))+
+  geom_point(aes(color = Species), size=2, stroke=1, alpha = 1)+  #scale_shape_manual(values=c(2, 1))+
+  scale_color_manual(values=c("#F8A42F", "#FF4605"))+
+  theme(legend.position="right")+
+  labs(x=(expression(paste("Geometric Shape SA (", cm^2,")"))),
+       y=(expression(paste("Wax Dip SA (",cm^2,")"))))+
+  theme_classic(base_size=12)+
+  geom_smooth(method="lm", color="black", size=0.5)+
+  annotate("text", x=10, y=75, size=5, colour="#bf9000", 
+           label= "y=1.6x+5.2")+ #Pocillopora
+  annotate("text", x=10, y=68, size=5, colour="#bf9000",
+           label="R^{2}==0.95", parse=T)+ #Pocillopora
+  annotate("text", x=40, y=13, size=5, colour="#FF4605", 
+           label= "y=1.1x+4.75")+ #Porites
+  annotate("text", x=40, y=6, size=5, colour="#FF4605",
+           label="R^{2}==0.90", parse=T) #Porites
+
 
