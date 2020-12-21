@@ -115,7 +115,7 @@ Porites <- MASTER%>%
   filter(Species=="Porites")%>%
   mutate(Diameter=rowMeans(cbind(Max.mm,Min.mm), na.rm=T))%>%
   mutate(SA.shape.cm2.hemi=(2*3.14*(Height.mm/10)*((Max.mm/2)/10)*((Min.mm/2)/10)))%>% #hemi-ellipsoid
-  mutate(SA.cm2.hemi=SA.shape.cm2.hemi*1.13) #converting estimated SA based on shape to actual using dip
+  mutate(SA.cm2.hemi=(SA.shape.cm2.hemi*1.13)+6.51) #converting estimated SA based on shape to actual using dip
                                  
   #filter(ID!="20")
 
@@ -163,7 +163,7 @@ Pocillopora <- MASTER%>%
   filter(Species=="Pocillopora")%>%
   mutate(Diameter=rowMeans(cbind(Max.mm,Min.mm), na.rm=T))%>%
   mutate(SA.shape.cm2.hemi=(2*3.14*(Height.mm/10)*((Max.mm/2)/10)*((Min.mm/2)/10)))%>% #hemi-ellipsoid
-  mutate(SA.cm2.hemi=SA.shape.cm2.hemi*1.63) #converting estimated SA based on shape to actual using dip
+  mutate(SA.cm2.hemi=((SA.shape.cm2.hemi*1.63)+6.94)) #converting estimated SA based on shape to actual using dip
 
 #LOG LOG
 ggplot(Pocillopora,aes(x=log10(Dry_weight.g*1000), y=log10(micromol.coral.min*60)))+

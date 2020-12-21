@@ -44,7 +44,7 @@ summary(Control_model)
 Control_model <-  lm(dip2_change~SA.shape.cm2, data=Control)
 summary(Control_model)
 
-#y= 0.0134144 x-0.0236067 
+#y (wax dip g)= 0.0134144 x (geometrix SA)-0.0236067 
 # 0.0134144 g = 1 cm^2
 
 ggplot(Control,aes(x=SA.shape.cm2, y=dip2_change))+
@@ -56,7 +56,7 @@ ggplot(Control,aes(x=SA.shape.cm2, y=dip2_change))+
 
 # Transforming grams to known surface area
 master <- wax%>%
-  mutate(SA.dip2.cm2=dip2_change/0.0134144)
+  mutate(SA.dip2.cm2=((dip2_change+0.0236067)/0.0134144))
 
 ############ PORITES ##################################################
 Porites <- master%>% 
@@ -100,7 +100,7 @@ ggplot(Porites,aes(x=SA.shape.cm2.hemi, y=SA.dip2.cm2))+
 Porites_model <-  lm(SA.dip2.cm2~SA.shape.cm2.hemi, data=Porites)
 summary(Porites_model)
 
-#now: y=1.13x+4.74755
+#now: y (Dip SA)=1.13x (Geom SA)+6.51
 #now: dip 1.13 cm2 = estimated 1 cm2
 
 ############ POCILLOPORA ##################################################
@@ -125,7 +125,7 @@ summary(Pocillopora_model.dip1)
 
 #Reduced data set: 2nd dip, higher R2 value
 Pocillopora_model.dip2 <-  lm(dip2_change~SA.shape.cm2.hemi, data=Poc_dip1)
-summary(Pocillopora_model)
+summary(Pocillopora_model.dip2)
 
 AIC(Pocillopora_model.dip1, Pocillopora_model.dip2)
 #dip 2 is way better
@@ -148,7 +148,7 @@ ggplot(Pocillopora,aes(x=SA.shape.cm2.hemi, y=SA.dip2.cm2))+
 Pocillopora_model <-  lm(SA.dip2.cm2~SA.shape.cm2.hemi, data=Pocillopora)
 summary(Pocillopora_model)
 
-#Now: y=1.628x+5.18
+#Now: y(Dip SA)=1.628x(SA shape)+6.93980
 #Now: 1.628 wax dip cm2 = 1 estimate cm2
 
 consolidated <- rbind(Pocillopora, Porites)%>%
