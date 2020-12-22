@@ -218,6 +218,7 @@ Consolidated <- rbind(Pocillopora, Porites)%>%
 #Temp ~27C
 #Chamber 240 mL
 #Salinity 34 ppt
+#Finished processing corals after 87 hours 37 min from collection time. Round up to 88
 
 ggplot(Consolidated,aes(x=log10(Dry_weight.g*1000), y=log10(micromol.coral.min*60), group =Species))+
   geom_point(aes(color = Species), size=2, stroke=1, alpha = 1)+

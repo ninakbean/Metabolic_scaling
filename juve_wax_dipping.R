@@ -90,18 +90,26 @@ ggplot(Porites,aes(x=SA.shape.cm2.hemi, y=SA.dip2.cm2))+
   theme(legend.position="right")+
   labs(x=(expression(paste("Geometric Shape SA (", cm^2,")"))),
        y=(expression(paste("Wax Dip SA (",cm^2,")"))))+
-  theme_classic(base_size=12)+
+  #theme_classic(base_size=12)+
   geom_smooth(method="lm", color="black", size=0.5)+
   annotate("text", x=30, y=10, size=5, colour="black", 
            label= "y=1.1x+4.75")+
   annotate("text", x=30, y=6, size=5, colour="black",
-           label="R^{2}==0.90", parse=T)
+           label="R^{2}==0.90", parse=T)+
+  scale_x_continuous(limits=c(0,40), breaks=seq(0,40,2))+
+  scale_y_continuous(limits=c(0,80), breaks=seq(0,80,2))
 
 Porites_model <-  lm(SA.dip2.cm2~SA.shape.cm2.hemi, data=Porites)
 summary(Porites_model)
 
 #now: y (Dip SA)=1.13x (Geom SA)+6.51
 #now: dip 1.13 cm2 = estimated 1 cm2
+
+#confidence intervals are correct
+#Testing that here
+new.dat <- data.frame(SA.shape.cm2.hemi=15)
+predict(Porites_model, newdata = new.dat, interval = 'confidence')
+#23.49937 22.239 24.75973
 
 ############ POCILLOPORA ##################################################
 
@@ -134,15 +142,18 @@ ggplot(Pocillopora,aes(x=SA.shape.cm2.hemi, y=SA.dip2.cm2))+
   geom_point(size=2, stroke=1, alpha = 1)+
   #scale_shape_manual(values=c(2, 1))+
   #scale_color_manual(values=c("#F8A42F", "#FF4605", "#860111"))+
-  theme(legend.position="right")+
+  #theme(legend.position="right")+
   labs(x=(expression(paste("Geometric Shape SA (", cm^2,")"))),
        y=(expression(paste("Wax Dip SA (",cm^2,")"))))+
-  theme_classic(base_size=12)+
+  #theme_classic(base_size=12)+
   geom_smooth(method="lm", color="black", size=0.5)+
   annotate("text", x=30, y=13, size=5, colour="black", 
          label= "y=1.6x+5.2")+
   annotate("text", x=30, y=6, size=5, colour="black",
-           label="R^{2}==0.95", parse=T)
+           label="R^{2}==0.95", parse=T)+
+  scale_x_continuous(limits=c(0,60), breaks=seq(0,60,5))+
+  scale_y_continuous(limits=c(0,100), breaks=seq(0,100,5))
+
 
 #All data
 Pocillopora_model <-  lm(SA.dip2.cm2~SA.shape.cm2.hemi, data=Pocillopora)
@@ -150,6 +161,12 @@ summary(Pocillopora_model)
 
 #Now: y(Dip SA)=1.628x(SA shape)+6.93980
 #Now: 1.628 wax dip cm2 = 1 estimate cm2
+
+#confidence intervals are correct
+#Testing that here
+new.dat <- data.frame(SA.shape.cm2.hemi=30)
+predict(Pocillopora_model, newdata = new.dat, interval = 'confidence')
+#55.78604 53.91849 57.65359
 
 consolidated <- rbind(Pocillopora, Porites)%>%
   select(-Notebook_order, -ID, -Diameter, -dip1_change, -SA.shape.cm2.dome)
