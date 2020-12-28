@@ -100,12 +100,12 @@ weight <- biomass%>%
 MASTER <- merge(weight, Slopes_corrected, by="ID")
 
 ################ ALL DATA #############################
-#ggplot(Master,aes(x=Elapsed_time_min, y= micromol.coral, group = ID))+
- # geom_point(aes(color = ID), size=2, stroke=1, alpha = 1)+
-#  theme(legend.position="right")+
-#  labs(x="Elapsed Time (min)",y="Oxygen")+
-#  theme_classic(base_size=12)+
-#  geom_smooth(method="lm", color="black", size=0.5)
+ggplot(Master,aes(x=Elapsed_time_min, y= micromol.coral, group = ID))+
+  geom_point(aes(color = ID), size=2, stroke=1, alpha = 1)+
+  theme(legend.position="right")+
+  labs(x="Elapsed Time (min)",y="Oxygen")+
+  theme_classic(base_size=12)+
+  geom_smooth(method="lm", color="black", size=0.5)
 
 ################### PORITES ########################################
 #assuming a hemi-ellipsoid= (2*3.14*height*radius1*radius2)
@@ -131,6 +131,8 @@ ggplot(Porites,aes(x=log10(Dry_weight.g*1000), y=log10(micromol.coral.min*60)))+
   #scale_x_continuous(breaks=seq(0,2000,200),limits=c(0,2000))
   #annotate("text", x=2.3, y=2.5, size=5, label= expression(paste(R^2 , " = 0.025, p=0.52")))+ #brooding
 
+#micromol/coral/hour
+#dry tissue mg
 Porites_model <-  lm(log10(micromol.coral.min*60)~log10(Dry_weight.g*1000), data=Porites)
 summary(Porites_model)
 
@@ -219,6 +221,7 @@ Consolidated <- rbind(Pocillopora, Porites)%>%
 #Chamber 240 mL
 #Salinity 34 ppt
 #Finished processing corals after 87 hours 37 min from collection time. Round up to 88
+#Juveniles incubated from 19-60 min. 
 
 ggplot(Consolidated,aes(x=log10(Dry_weight.g*1000), y=log10(micromol.coral.min*60), group =Species))+
   geom_point(aes(color = Species), size=2, stroke=1, alpha = 1)+
@@ -256,109 +259,9 @@ ggplot(Consolidated, aes(x=log10(SA.cm2.hemi), y=log10(Dry_weight.g*1000), group
 # geom_abline(intercept = 0, slope = 1, color="red", 
 #              linetype="dashed", size=1.5)
   
-
   #Pocillopora, dry: adj R2:0.8951, p <0.001, 
   #y=0.7414 (+-0.07979)x+0.30990
   
   #Porites, dry: adj R2:0.9255, p = 5.396e-06, 
   #y= 1.01264(+-  0.09532)x + 0.48072
 
-################### RUNNING ANCOVA WITH SA AS COVARIATE##################
-#COMPARE SLOPES WITH ANCOVA
-#All did not have significant interaction between respiration and data sheet, so can tease apart resp and age
-#Best model is to not include interaction
-#Age has an effect on respiration, datasheet doesn't
-#Pairwise says the datasheets are significantly the same
-
-#### RUNNING ANCOVA #### RAW DATA
-#The orders of variables matters when computing ANCOVA. 
-#You want to remove the effect of the covariate first - 
-#that is, you want to control for it - prior to entering your main variable or interest.
-
-#For ANCOVA, need to look at type I because the first variable is continuous
-#Type I: 
-#Balanced data, sequential (first variable considered, then the next for error)
-#aov defaults to type I
-#Use Anova function for type II and III
-#Type 2: Unbalanced data, principle of marginality, does not consider interactions. 
-#Don't use if interactions are present. If no interaction, more powerful than type 3. 
-#Type 3: Unbalanced data, use when sig. interactions, you have to make orthogonal contrasts?
-
-# Type I ANOVA - aov()
-#aov(time.lm)
-
-# Type II ANOVA - Anova(type = 2)
-#car::Anova(time.lm, type = 2)
-
-# Type III ANOVA - Anova(type = 3)
-#car::Anova(time.lm, type = 3)
-###
-#ASSUMPTIONS
-#Linearity between the covariate and the outcome variable at each level of the grouping variable. 
-#This can be checked by creating a grouped scatter plot of the covariate and the outcome variable.
-#Homogeneity of regression slopes. 
-#check for no significant interaction between the covariate and the grouping variable
-#The slopes of the regression lines, formed by the covariate and the 
-#outcome variable, should be the same for each group. 
-#This assumption evaluates that there is no interaction between the outcome and the covariate. 
-#The plotted regression lines by groups should be parallel.
-#The outcome variable should be approximately normally distributed. 
-#This can be checked using the Shapiro-Wilk test of normality on the model residuals.
-#Homoscedasticity or homogeneity of residuals variance for all groups. 
-#The residuals are assumed to have a constant variance (homoscedasticity)
-#No significant outliers in the groups
-
-#Linearity #ASSUMPTION MET
-
-ggscatter(
-  Consolidated, x = "log.Dry_weight.mg", y = "log.micromol.coral.hr",
-  color = "Species", add = "reg.line"
-)+
-  stat_regline_equation(
-    aes(label =  paste(..eq.label.., ..rr.label.., sep = "~~~~"), color = Species)
-  )
-
-#Homogeneity of slopes
-#lines are parallel
-#LOOK AT THESE SITES
-#https://www.researchgate.net/post/How_can_continue_ANCOVA_when_assumption_of_homogeneity_of_regression_slopes_is_violated
-#https://www.theanalysisfactor.com/assumptions-of-ancova/
-
-
-Consolidated %>% anova_test(log.micromol.coral.hr ~ Species*log.Dry_weight.mg)
-# Interaction term is significant
-#There is a significant effect of species on dry weight, so the slopes are not parallel
-#Although not parallel, slopes are similar, indicating that the homogeneity of slopes assumption is met.
-
-#Normality of residuals
-# Fit the model, the covariate goes first
-model <- lm(log.micromol.coral.hr ~ log.Dry_weight.mg + Species, data = Consolidated)
-# Inspect the model diagnostic metrics
-model.metrics <- augment(model) %>%
-  select(-.hat, -.sigma, -.fitted, -.se.fit) # Remove details
-head(model.metrics, 3)
-# Assess normality of residuals using shapiro wilk test
-shapiro_test(model.metrics$.resid)
-#>0.05, normal data 
-
-#Homogeneity of variances #ASSUMPTION MET
-model.metrics %>% levene_test(.resid ~ Species)
-
-#outliers
-model.metrics %>% 
-  filter(abs(.std.resid) > 3) %>%
-  as.data.frame()
-#There was one outier
-
-res.aov <- Consolidated %>% anova_test(log.micromol.coral.hr ~ log.Dry_weight.mg + Species)
-get_anova_table(res.aov)
-
-
-# Pairwise comparisons
-library(emmeans)
-pwc <- Consolidated%>% 
-  emmeans_test(
-    log.micromol.coral.hr ~ Species, covariate = log.Dry_weight.mg,
-    p.adjust.method = "bonferroni"
-  )
-pwc
