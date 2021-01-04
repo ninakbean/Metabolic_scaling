@@ -102,7 +102,8 @@ ggplot(Porites,aes(x=SA.shape.cm2.hemi, y=SA.dip2.cm2))+
 Porites_model <-  lm(SA.dip2.cm2~SA.shape.cm2.hemi, data=Porites)
 summary(Porites_model)
 
-#now: y (Dip SA)=1.13x (Geom SA)+6.51
+#porites
+#now: y (Dip SA)=1.13x (Geom SA)+6.51, R2: 0.90, p<0.001
 #now: dip 1.13 cm2 = estimated 1 cm2
 
 #confidence intervals are correct
@@ -159,7 +160,8 @@ ggplot(Pocillopora,aes(x=SA.shape.cm2.hemi, y=SA.dip2.cm2))+
 Pocillopora_model <-  lm(SA.dip2.cm2~SA.shape.cm2.hemi, data=Pocillopora)
 summary(Pocillopora_model)
 
-#Now: y(Dip SA)=1.628x(SA shape)+6.93980
+#Pocillopora
+#Now: y(Dip SA)=1.628x(SA shape)+6.93980, R2: 0.95, p<0.001
 #Now: 1.628 wax dip cm2 = 1 estimate cm2
 
 #confidence intervals are correct
@@ -187,12 +189,16 @@ ggplot(consolidated,aes(x=SA.shape.cm2.hemi, y=SA.dip2.cm2, group=Species))+
   theme_classic(base_size=12)+
   geom_smooth(method="lm", color="black", size=0.5)+
   annotate("text", x=10, y=75, size=5, colour="#bf9000", 
-           label= "y=1.6x+5.2")+ #Pocillopora
+           label= "y=1.6x+6.9")+ #Pocillopora
   annotate("text", x=10, y=68, size=5, colour="#bf9000",
            label="R^{2}==0.95", parse=T)+ #Pocillopora
   annotate("text", x=40, y=13, size=5, colour="#FF4605", 
-           label= "y=1.1x+4.75")+ #Porites
+           label= "y=1.1x+6.5")+ #Porites
   annotate("text", x=40, y=6, size=5, colour="#FF4605",
            label="R^{2}==0.90", parse=T) #Porites
 
 
+#porites
+#now: y (Dip SA)=1.13x (Geom SA)+6.51, R2: 0.90, p<0.001
+#Pocillopora
+#Now: y(Dip SA)=1.628x(SA shape)+6.93980, R2: 0.95, p<0.001

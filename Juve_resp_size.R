@@ -77,7 +77,7 @@ Master_Slopes <- merge(Regression, R2, by="ID")%>%
   rename(Height.mm=Height.mm.x)%>%
   rename(Date=Date.x.x)%>%
   rename(micromol.coral.min=estimate)%>%
-  select(Date, Species, ID, Max.mm, Min.mm, Height.mm, micromol.coral.min, std.error, p.value.x, adj.r.squared)
+  select(Date, Species, ID, Max.mm, Min.mm, Height.mm, micromol.coral.min, std.error, p.value.x, adj.r.squared, r.squared)
 
 #correcting all measurements on 11/09/2020 based on control slope
 nineth <- Master_Slopes%>%
@@ -110,52 +110,45 @@ ggplot(Master,aes(x=Elapsed_time_min, y= micromol.coral, group = ID))+
 ################### PORITES ########################################
 #assuming a hemi-ellipsoid= (2*3.14*height*radius1*radius2)
 #dip 1.13 cm2 = estimated 1 cm2
+#when you add elevation, the slope changes and R2 changes
 
 Porites <- MASTER%>%  
   filter(Species=="Porites")%>%
   mutate(Diameter=rowMeans(cbind(Max.mm,Min.mm), na.rm=T))%>%
   mutate(SA.shape.cm2.hemi=(2*3.14*(Height.mm/10)*((Max.mm/2)/10)*((Min.mm/2)/10)))%>% #hemi-ellipsoid
-  mutate(SA.cm2.hemi=(SA.shape.cm2.hemi*1.13)+6.51) #converting estimated SA based on shape to actual using dip
-                                 
-  #filter(ID!="20")
+  mutate(SA.cm2.hemi=(SA.shape.cm2.hemi*1.13)+6.51)%>% #converting estimated SA based on shape to actual using dip
+  mutate(x=log10(SA.cm2.hemi))%>%
+  mutate(y=log10(Dry_weight.g*1000))
 
-#Log log
-ggplot(Porites,aes(x=log10(Dry_weight.g*1000), y=log10(micromol.coral.min*60)))+
-  geom_point(size=2, stroke=1, alpha = 1)+
-  #scale_shape_manual(values=c(2, 1))+
-  #scale_color_manual(values=c("#F8A42F", "#FF4605", "#860111"))+
-  theme(legend.position="right")+
-  labs(x="Log Dry Tissue (mg)",y=(expression(paste("Log Respiration (", mu , "mol", " ", O[2], " ", h^-1,")"))))+
-  theme_classic(base_size=12)+
-  geom_smooth(method="lm", color="black", size=0.5)
-  #scale_x_continuous(breaks=seq(0,2000,200),limits=c(0,2000))
-  #annotate("text", x=2.3, y=2.5, size=5, label= expression(paste(R^2 , " = 0.025, p=0.52")))+ #brooding
+Porites.dry.no.outlier <- Porites%>%
+  filter(ID!="20") #this is better, but R2 is worse! 
 
-#micromol/coral/hour
-#dry tissue mg
-Porites_model <-  lm(log10(micromol.coral.min*60)~log10(Dry_weight.g*1000), data=Porites)
-summary(Porites_model)
+model <-  lm(y~x, data=Porites)
+model.no.outlier <-  lm(y~x, data=Porites.dry.no.outlier)
+Anova(model, model.no.outlier, type=3)
+AIC(model, model.no.outlier)
 
-#Porites, resp: adj R2:0.8386, p = 0.000123, y= 0.65493(+- 0.09477)x-0.32735
-#Overlaps with 0.75
-#0.65493-0.09477 = 0.56016
-#0.65493+0.09477 = 0.7497
-#0.56-0.75
+summary(model, type=II)
+summary(model.no.outlier, type = II)
 
+out <- as.data.frame(augment(model))
+cooks <- cooks.distance(model)
+plot(cooks)
+#4/n(10) = 0.4
+#y=0.3222193, x=0.8705974, ID=20
 
-#SA, Dry_weight
-ggplot(Porites,aes(x=log10(SA.cm2.hemi), y=log10(Dry_weight.g*1000)))+
-  geom_point(size=2, stroke=1, alpha = 1)+
-  theme(legend.position="right")+
-  labs(x=(expression(paste("Log Surface Area ", (mm^2)))), y="Log Dry Weight (mg)")+
-  theme_classic(base_size=12)+
-  geom_smooth(method="lm", color="black", size=0.5)
+#full data one
+#t=(estimated value-hypothesized value)/standard error of the estimator
+t=(2.0715-(1))/0.3568
+t
+2*pt(abs(t),df=9, lower=FALSE) #gives you p value
 
-Porites_dry <-  lm(log10(Dry_weight.g*1000)~log10(SA.cm2.hemi), data=Porites)
-summary(Porites_dry)
-
-#Porites, dry: adj R2:0.9255, p = 5.396e-06, 
-#y= 1.01264(+-  0.09532)x + 0.48072
+#outlier one
+#t=(estimated value-hypothesized value)/standard error of the estimator
+t=(1.5659-(1))/0.3261
+t
+2*pt(abs(t),df=8, lower=FALSE) #gives you p value
+#not significantly different from 1
 
 ################### POCILLOPORA ########################################
 #assuming a hemi-ellipsoid= (2*3.14*height*radius1*radius2)
@@ -165,47 +158,47 @@ Pocillopora <- MASTER%>%
   filter(Species=="Pocillopora")%>%
   mutate(Diameter=rowMeans(cbind(Max.mm,Min.mm), na.rm=T))%>%
   mutate(SA.shape.cm2.hemi=(2*3.14*(Height.mm/10)*((Max.mm/2)/10)*((Min.mm/2)/10)))%>% #hemi-ellipsoid
-  mutate(SA.cm2.hemi=((SA.shape.cm2.hemi*1.63)+6.94)) #converting estimated SA based on shape to actual using dip
+  mutate(SA.cm2.hemi=((SA.shape.cm2.hemi*1.63)+6.94))%>% #converting estimated SA based on shape to actual using dip
+  mutate(x = log10(SA.cm2.hemi))%>%
+  mutate(y=log10(Dry_weight.g*1000))
 
-#LOG LOG
-ggplot(Pocillopora,aes(x=log10(Dry_weight.g*1000), y=log10(micromol.coral.min*60)))+
-  geom_point( size=2, stroke=1, alpha = 1)+
-  #scale_shape_manual(values=c(2, 1))+
-  #scale_color_manual(values=c("#F8A42F", "#FF4605", "#860111"))+
-  theme(legend.position="right")+
-  labs(x="Log Dry Tissue (mg)",y=(expression(paste("Log Respiration (", mu , "mol", " ", O[2], " ", h^-1,")"))))+
-  theme_classic(base_size=12)+
-  geom_smooth(method="lm", color="black", size=0.5)
-#scale_y_continuous(breaks=seq(80,105,10),limits=c(80,105))
-#annotate("text", x=2.3, y=2.5, size=5, label= expression(paste(R^2 , " = 0.025, p=0.52")))+ #brooding
+Pocillopora.dry.no.outlier <- Pocillopora%>%
+  filter(ID!="23") #this improves the model
 
-Pocillopora_model <-  lm(log10(micromol.coral.min*60)~log10(Dry_weight.g*1000), data=Pocillopora)
-summary(Pocillopora_model)
+model <-  lm(y~x, data=Pocillopora)
+model.no.outlier <-  lm(y~x, data=Pocillopora.dry.no.outlier)
+Anova(model, model.no.outlier, type=3)
+AIC(model, model.no.outlier)
 
-#Pocillopora, resp: adj R2:0.9158 , p <0.001, y=0.99492 (+-0.09497)x-0.46673 
-#overlaps 1
-#0.99492-0.09497=0.89995
-#0.99492+0.09497=1.08989
-#0.90-1.1
+summary(model, type=II)
+summary(model.no.outlier, type=II)
 
-#SA, Dry_weight
-ggplot(Pocillopora, aes(x=log10(SA.cm2.hemi), y=log10(Dry_weight.g*1000)))+
-  geom_point(size=2, stroke=1, alpha = 1)+
-  theme(legend.position="right")+
-  labs(x=(expression(paste("Log Surface Area ", (mm^2)))), y="Log Dry Weight (mg)")+
-  theme_classic(base_size=12)+
-  geom_smooth(method="lm", color="black", size=0.5)
+out <- as.data.frame(augment(model))
+cooks <- cooks.distance(model)
+plot(cooks)
+#4/n(11) = 0.36
+#y=0.7634280, x=, ID=23
 
-Pocillopora_dry <-  lm(log10(Dry_weight.g*1000)~log10(SA.cm2.hemi), data=Pocillopora)
-summary(Pocillopora_dry)
+#full data set
+#t=(estimated value-hypothesized value)/standard error of the estimator
+t=(0.9794-(1))/0.1185
+t
+2*pt(abs(t),df=10, lower=FALSE) #gives you p value
+#not significantly different from 3/4 or 1
 
-#Pocillopora, dry: adj R2:0.8951, p <0.001, 
-#y=0.7414 (+-0.07979)x+0.30990
+#outlier one
+#t=(estimated value-hypothesized value)/standard error of the estimator
+t=(0.89785-(2/3))/0.11351
+t
+2*pt(abs(t),df=9, lower=FALSE) #gives you p value
+#not significantly different from 3/4 or 1 or 2/3
 
 ################### CONSOLIDATED ########################################
 #I need to consolidate because I got the surface area separately
 Consolidated <- rbind(Pocillopora, Porites)%>%
   select(-Diameter,-SA.shape.cm2.hemi)
+
+Consolidated.no.outliers <- rbind(Pocillopora.dry.no.outlier,Porites.dry.no.outlier)
 
 #write_xlsx(list(data=Consolidated),"Data/Juveniles/Data/R_juve_resp_size.xlsx")
 
@@ -223,45 +216,113 @@ Consolidated <- rbind(Pocillopora, Porites)%>%
 #Finished processing corals after 87 hours 37 min from collection time. Round up to 88
 #Juveniles incubated from 19-60 min. 
 
-ggplot(Consolidated,aes(x=log10(Dry_weight.g*1000), y=log10(micromol.coral.min*60), group =Species))+
-  geom_point(aes(color = Species), size=2, stroke=1, alpha = 1)+
-  scale_color_manual(values=c("#F8A42F", "#FF4605"))+ 
-                     #labels = c((expression(paste(italic("Pocillopora spp.")))), 
-                      #          (expression(paste(italic("Porites spp."))))))+
-  theme(legend.position="right")+
-  labs(x="Log Dry Tissue (mg)",y=(expression(paste("Log Respiration (", mu , "mol", " ", O[2], " ", coral^-1, " ", h^-1,")"))))+
-  theme_classic(base_size=12)+
-  geom_smooth(method="lm", color="black", size=0.5)
-  annotate("text", x=0.9, y=1.1, size=5, colour="#bf9000", label= (expression(paste("y=0.99x-0.47"))))+
-  annotate("text", x=0.9, y=1, size=5, colour="#bf9000", label= (expression(paste(r^2, "=0.92"))))+
-  annotate("text", x=1.5, y=0.1, size=5, colour="#FF4605", label= (expression(paste("y=0.65x-0.33"))))+
-  annotate("text", x=1.5, y=0, size=5, colour="#FF4605", label= (expression(paste(r^2, "=0.84"))))
-             
-#Pocillopora: y=0.99492 (+-0.09497), overlaps 1
-#Porites: y= 0.65493(+- 0.09477)x, Overlaps with 0.75
 
+# Step 1: Call the pdf command to start the plot
+#pdf(file = "Figs/Empirical/Juveniles/size.pdf",   # The directory you want to save the file in
+#    width = 7, # The width of the plot in inches
+#    height = 6) # The height of the plot in inches
+
+# Step 2: Create the plot with R code
 #SA, Dry_weight
 ggplot(Consolidated, aes(x=log10(SA.cm2.hemi), y=log10(Dry_weight.g*1000), group = Species))+
   geom_point(aes(color = Species), size=2, stroke=1, alpha = 1)+
-  scale_color_manual(values=c("#F8A42F", "#FF4605"))+
+  scale_color_manual(values=c("#F8A42F", "#FF4605"),name="Genera", 
+                     labels = c((expression(paste(italic("Pocillopora spp.")))),
+                                expression(paste(italic("Porites spp.")))))+ 
   theme(legend.position="right")+
   labs(x=(expression(paste("Log Surface Area ", (cm^2)))), y="Log Dry Tissue (mg)")+
   theme_classic(base_size=12)+
   geom_smooth(method="lm", color="black", size=0.5)+
-  annotate("text", x=1.6, y=0.8, size=5, colour="#bf9000", 
-           label= "y=0.74x+0.31")+ #Pocillopora
-  annotate("text", x=1.6, y=0.7, size=5, colour="#bf9000", 
-           label= "R^{2}==0.90", parse=T)+ #Pocillopora
-  annotate("text", x=0.3, y=1.8, size=5, colour="#FF4605", 
-           label= "y=1.0x+0.48")+ #Porites
-  annotate("text", x=0.3, y=1.7, size=5, colour="#FF4605", 
-           label= "R^{2}==0.93", parse=T) #Porites
+  theme(legend.text.align = 0,
+        legend.position = c(0.8, 0.15))+
+  geom_abline(intercept=-0.7, slope=1, colour = "black", size = 0.5, lty=5)+
+  geom_abline(intercept=1.1, slope=(2/3), colour = "black", size = 0.5, lty=5)+
+  annotate("text", x=1, y=2, size=5, colour="black", label= "b=2/3")+
+  annotate("text", x=1.25, y=0.4, size=5, colour="black", label= "b=1")
+
+# Step 3: Run dev.off() to create the file!
+#“null device”<- saying now create plots in the main R plotting window again.
+dev.off()
+
+  #annotate("text", x=1.6, y=0.8, size=5, colour="#bf9000", 
+  #         label= "y=0.74x+0.31")+ #Pocillopora
+  #annotate("text", x=1.6, y=0.7, size=5, colour="#bf9000", 
+  #         label= "R^{2}==0.90", parse=T)+ #Pocillopora
+  #annotate("text", x=0.3, y=1.8, size=5, colour="#FF4605", 
+  #         label= "y=1.0x+0.48")+ #Porites
+  #annotate("text", x=0.3, y=1.7, size=5, colour="#FF4605", 
+  #         label= "R^{2}==0.93", parse=T) #Porites
 # geom_abline(intercept = 0, slope = 1, color="red", 
 #              linetype="dashed", size=1.5)
   
-  #Pocillopora, dry: adj R2:0.8951, p <0.001, 
-  #y=0.7414 (+-0.07979)x+0.30990
-  
-  #Porites, dry: adj R2:0.9255, p = 5.396e-06, 
-  #y= 1.01264(+-  0.09532)x + 0.48072
+
+################## ANCOVA ###################################
+#ASSUMPTION 1
+#Linearity between the covariate and the outcome variable at each level of the grouping variable. 
+#This can be checked by creating a grouped scatter plot of the covariate and the outcome variable.
+
+ggscatter(
+  data=Consolidated, x = "x", y = "y",
+  color = "Species", add = "reg.line"
+)+
+  stat_regline_equation(
+    aes(label =  paste(..eq.label.., ..rr.label.., sep = "~~~~"), color = Species)
+  )
+
+ggscatter(
+  data=Consolidated.no.outliers, x = "x", y = "y",
+  color = "Species", add = "reg.line"
+)+
+  stat_regline_equation(
+    aes(label =  paste(..eq.label.., ..rr.label.., sep = "~~~~"), color = Species)
+  )
+
+#Homogeneity of slopes
+#The slopes of the regression lines should be the same for each group. 
+#This assumption checks that there is no significant interaction between the covariate and the grouping variable.
+#The plotted regression lines by groups should be parallel.
+
+model <- lm(y ~ Species*x, data=Consolidated)
+model.no.outlier <- lm(y ~ Species*x, data=Consolidated.no.outliers)
+Anova(model, type=3)
+Anova(model.no.outlier, type=3)
+
+Anova(model, model.no.outlier, type=3) #tests significantly different
+AIC(model, model.no.outlier) #removing outliers is better
+
+model1 <- lm(y ~ Species+x, data=Consolidated) #saying lines are parall
+model2 <- lm(y ~ + x, data=Consolidated) #saying type has no effect
+
+Anova(model, model1, type=3) #keep interaction term, because sig difference
+Anova(model, model2, type=3) #groups are significant
+AIC(model, model1, model2) #reinforces full model is needed
+
+#x has effect on y, there is a difference in slope of this relationship
+#by type, as indicated by interaction term. 
+step(model) #tries removing the most complicated term and gives you AIC
+#If take out interaction term, AIC gets worse
+
+
+#ASSUMPTION 3
+#Normality of residuals
+#The outcome variable should be approximately normally distributed. 
+#This can be checked using the Shapiro-Wilk test of normality on the model residuals.
+
+# Inspect the model diagnostic metrics
+model.metrics <- augment(model)
+# Assess normality of residuals using shapiro wilk test
+shapiro_test(model.metrics$.resid)
+#>0.05, normal data 
+
+#ASSUMPTION 4
+#Homogeneity of variances (aka homoscedasticity)
+#ANCOVA assumes that the variance of the residuals is equal for all groups. 
+#This can be checked using the Levene’s test
+model.metrics %>% levene_test(.resid ~ Species)
+#The Levene’s test was not significant (p > 0.05)
+#assume homogeneity of the residual variances for all groups.
+
+
+
+
 

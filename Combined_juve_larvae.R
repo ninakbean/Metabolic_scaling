@@ -32,13 +32,32 @@ juve <-read_excel("Data/Juveniles/Data/R_juve_resp_size.xlsx",sheet="data")
 larvae <-read_excel("Data/Larvae/R_larvae_resp_size.xlsx",sheet="data")
 data_comp <- read_excel("Data/Data_comp/my_data/Meta_analysis.xlsx", sheet="Repiration.Photosynthesis")
 
+#CREATING DATA SETS and checking for outliers
+
 larv <- larvae %>%
   select(ID, pikomol.larva.min,Dry_weight.mg, c_divide_SE.mg, -Dry_weight.mg.SE)%>%
   mutate(Species=c("Pocillopora"))%>% #column called species which is filled with poc
   mutate(Stage=c("larvae"))%>%
   unite(Type, Species, Stage, sep = "_", remove = FALSE, na.rm = FALSE)%>%
   mutate(micromol.ind.min=(pikomol.larva.min/1000000))%>%
-  select(-pikomol.larva.min) #need to have same colum names as juveniles
+  select(-pikomol.larva.min)%>% #need to have same colum names as juveniles
+  mutate(x = log10(Dry_weight.mg))%>%
+  mutate(y = log10(micromol.ind.min*60))
+
+larvae.model <- lm(y ~ x, data=larv)
+Anova(larvae.model, type=3)
+summary(larvae.model, type=II)
+
+out <- as.data.frame(augment(larvae.model))
+cooks <- cooks.distance(larvae.model)
+plot(cooks)
+#4/n(17) = 0.23
+#no outliers
+#t=(estimated value-hypothesized value)/standard error of the estimator
+t=(0.4885-(3/4))/0.1623
+t
+2*pt(abs(t),df=16, lower=FALSE) #gives you p value
+#not significantly different from 2/3 or 3/4
 
 juv <- juve %>%
   rename(micromol.ind.min = micromol.coral.min)%>%
@@ -46,18 +65,134 @@ juv <- juve %>%
   mutate(Stage=c("juvenile"))%>%
   mutate(c_divide_SE.mg=c(0))%>%
   unite(Type, Species, Stage, sep = "_", remove = FALSE, na.rm = FALSE)%>%
-  select(Dry_weight.mg, c_divide_SE.mg, micromol.ind.min, Type, Species, Stage, ID)
+  select(Dry_weight.mg, c_divide_SE.mg, micromol.ind.min, Type, Species, Stage, ID)%>%
+  mutate(x = log10(Dry_weight.mg))%>%
+  mutate(y = log10(micromol.ind.min*60))
+
+port <- juv %>%
+  filter(Species=="Porites")
+
+port.no.outlier <- port%>%
+  filter(!(ID=="20" & Type == "Porites_juvenile"))
+
+port.model <- lm(y ~ x, data=port)
+port.model.no.outlier <- lm(y ~ x, data=port.no.outlier)
+
+AIC(port.model, port.model.no.outlier)
+Anova(port.model, port.model.no.outlier, type=3)
+
+summary(port.model, type=3)
+summary(port.model.no.outlier, type=3)
+
+out <- as.data.frame(augment(port.model))
+cooks <- cooks.distance(port.model)
+plot(cooks)
+
+#4/n(10) = 0.4
+#-0.3381778, 0.3222193, Porites_juvenile #ID: 20
+#didn't make 0.4 cut off, but visually...
+#0.4639831, 0.7403627, Porites_juvenile #ID: 11
+
+#full model
+#t=(estimated value-hypothesized value)/standard error of the estimator
+t=(0.65493-(1))/0.09477
+t
+2*pt(abs(t),df=9, lower=FALSE) #gives you p value
+#not sig similar to any slope
+
+#outlier one
+#t=(estimated value-hypothesized value)/standard error of the estimator
+t=(0.35245-(2/3))/0.05938
+t
+2*pt(abs(t),df=8, lower=FALSE) #gives you p value
+#not sig similar to any slope
+
+poc <- juv %>%
+  filter(Species=="Pocillopora")
+
+poc.model <- lm(y ~ x, data=poc)
+summary(poc.model, type=3)
+out <- as.data.frame(augment(poc.model))
+cooks <- cooks.distance(poc.model)
+plot(cooks)
+#4/n(11) = 0.36
+#no outliers
+
+#t=(estimated value-hypothesized value)/standard error of the estimator
+t=(0.99492-(1))/0.09497
+t
+2*pt(abs(t),df=10, lower=FALSE) #gives you p value
+#similar to 1
 
 combined <- rbind(larv, juv)
 
+out <- as.data.frame(augment(combined.model))
+cooks <- cooks.distance(combined.model)
+plot(cooks)
+#4/n(38) = 0.1
+#-0.3381778, 0.3222193, Porites_juvenile #ID: 20
+#0.4639831, 0.7403627, Porites_juvenile #ID: 11
+
+combined.11.ol <- combined%>% #BEST MODEL
+  filter(!(ID=="20" & Type == "Porites_juvenile"))
+
+combined.12.ol <- combined%>%
+  filter(!(ID=="11" & Type == "Porites_juvenile"))
+
+combined.2.ol <- combined%>%
+  filter(!(ID=="20" & Type == "Porites_juvenile"))%>%
+  filter(!(ID=="11" & Type == "Porites_juvenile"))
+
+model <- lm(y ~ Type*x, data=combined)
+model.11.ol <- lm(y ~ Type*x, data=combined.11.ol)
+model.12.ol <- lm(y ~ Type*x, data=combined.12.ol)
+model.2.ol <- lm(y ~ Type*x, data=combined.2.ol)
+
+Anova(model,model.11.ol, type =3) #tests significantly different
+Anova(model.11.ol, model.12.ol, type =3) #tests significantly different
+Anova(model, model.12.ol, type=3) #tests significantly different
+AIC(model,model.11.ol, model.12.ol, model.2.ol) #removing one is the best, highest cooks distance one
+
+#keep interaction term?
+model1 <- lm(y ~ Type+x, data=combined) #saying lines are parallel
+model2 <- lm(y ~ + x, data=combined) #saying type has no effect
+
+Anova(model, model1, type=3) #keep interaction term, because sig difference
+Anova(model, model2, type=3) #groups are significant
+AIC(model, model1, model2) #reinforces full model is needed
+
+Anova(model, type =3)
+Anova(model.11.ol, type=3)
+#x has effect on y, there is a difference in slope of this relationship
+#by type, as indicated by interaction term. 
+step(model) #tries removing the most complicated term and gives you AIC
+#If take out interaction term, AIC gets worse
+
+# Step 1: Call the pdf command to start the plot
+pdf(file = "Figs/Empirical/Combined.pdf",   # The directory you want to save the file in
+    width = 7, # The width of the plot in inches
+    height = 6) # The height of the plot in inches
+
+# Step 2: Create the plot with R code
 ggplot(combined,aes(x=log10(Dry_weight.mg), y=log10(micromol.ind.min*60), group = Type))+
-  geom_point(aes(color = Species), size=2, stroke=1, alpha = 1)+
-  geom_errorbar(aes(xmin=(log10(Dry_weight.mg))-c_divide_SE.mg, xmax=(log10(Dry_weight.mg))+c_divide_SE.mg), position = "identity", stat = "identity")+
-  scale_color_manual(values=c("#F8A42F", "#FF4605"))+ 
-  theme(legend.position="right")+
+  geom_point(aes(color = Species, shape=Stage), size=2, stroke=1, alpha = 1)+
+  geom_errorbar(aes(xmin=(log10(Dry_weight.mg))-c_divide_SE.mg, xmax=(log10(Dry_weight.mg))+c_divide_SE.mg), position = "identity", stat = "identity", size=0.4)+
+  scale_color_manual(values=c("#F8A42F", "#FF4605"),name="Genera", 
+                     labels = c((expression(paste(italic("Pocillopora spp.")))),
+                                expression(paste(italic("Porites spp.")))))+ 
   labs(x="Log Dry Tissue (mg)",y=(expression(paste("Log Respiration (", mu , "mol", " ", O[2], " ", coral^-1, " ", h^-1,")"))))+
   theme_classic(base_size=12)+
-  geom_smooth(method="lm", color="black", size=0.5)
+  geom_smooth(method="lm", color="black", size=0.5)+
+  theme(legend.text.align = 0,
+        legend.position = c(0.8, 0.2))+
+  geom_abline(intercept=-1.5, slope=1, colour = "black", size = 0.5, lty=5)+
+  geom_abline(intercept=0.4, slope=(2/3), colour = "black", size = 0.5, lty=5)+
+  annotate("text", x=-1.5, y=0, size=5, colour="black", label= "b=2/3")+
+  annotate("text", x=-0.5, y=-2.5, size=5, colour="black", label= "b=1")
+
+# Step 3: Run dev.off() to create the file!
+#“null device”<- saying now create plots in the main R plotting window again.
+dev.off()
 
 #Can't find any porites larvae in literature (based on a quick search and 
 #my data comp)
@@ -65,54 +200,12 @@ past <- data_comp%>%
   filter(Species=="Porites astreoides")
 
 ################### RUNNING ANCOVA WITH SA AS COVARIATE##################
-#Best guide:
-#https://www.datanovia.com/en/lessons/ancova-in-r/#:~:text=Homogeneity%20of%20regression%20slopes.,by%20groups%20should%20be%20parallel.
-
-#When Assumptions of ANCOVA are Irrelevant:
-#Case where the independent variable and the covariate are 
-#independent of each other...
-#https://www.theanalysisfactor.com/assumptions-of-ancova/
-
-#ANCOVA Assumptions: When Slopes are Unequal
-#Addressing assumption: There is no interaction between independent variable and the covariate.
-#https://www.theanalysisfactor.com/ancova-assumptions-when-slopes-are-unequal/
-#ANCOVA can only be used if the lines are parallel. <- This is true IF
-#the purpose of ANCOVA is to reduce error variation and allow us to report a single, 
-#overall effect of the independent variable on the dependent variable, at every value of the covariate.
-#If you violate this assumption, all it means is that you can't
-#1) Run the unique model without an interaction that many people mean when they say “ANCOVA.”
-#2) describe the effect of the grouping on the DV without also including some information about age.
-#What model to do? Read in article!
-#Run the full model with the interaction, describe the results in detail, and don’t call it ANCOVA to appease reviewers.
-#But including the interaction term is not wrong because it doesn’t meet an assumption.  
-#The assumption is more about defining which models we can call ANCOVA than it is about which models best fit the data.
-
-#DATA SETS: combined, larv, juv
-
-#ANCOVA: 
-#dependent variable (outcome)
-#grouping variable
-#Independent variable (covariate)
-
-ANCOVA_data <- combined%>%
-  mutate(x = log10(Dry_weight.mg))%>%
-  mutate(y = log10(micromol.ind.min*60))
-
-ANCOVA_data.no.outliers <- ANCOVA_data%>%
-  filter(!(ID=="11" & Type == "Porites_juvenile"))
-  #filter(!(ID=="20" & Type == "Porites_juvenile"))
-  #filter(!(ID=="23" & Type == "Pocillopora_juvenile"))
-  
-#0.4639831, 0.7403627, Porites_juvenile #ID: 11
-#-0.3381778, 0.3222193, Porites_juvenile #ID: 20
-#0.2345787, 0.7634280, Pocillopora_juvenile #ID: 23
-
 #ASSUMPTION 1
 #Linearity between the covariate and the outcome variable at each level of the grouping variable. 
 #This can be checked by creating a grouped scatter plot of the covariate and the outcome variable.
 
 ggscatter(
-  data=ANCOVA_data, x = "x", y = "y",
+  data=combined, x = "x", y = "y",
   color = "Type", add = "reg.line"
 )+
   stat_regline_equation(
@@ -120,97 +213,37 @@ ggscatter(
   )
 
 ggscatter(
-  data=ANCOVA_data.no.outliers, x = "x", y = "y",
+  data=combined.11.ol, x = "x", y = "y",
   color = "Type", add = "reg.line"
 )+
   stat_regline_equation(
     aes(label =  paste(..eq.label.., ..rr.label.., sep = "~~~~"), color = Type)
   )
 
-#taking out outliers makes the R2 go down for porites and larvae
-
-#independence between the independent variable (aka grouping variable) and the covariate
-#is violated because larvae are on the left of the graph
-#the main categorical independent variable is observed and not manipulated, 
-#the independence assumption between the covariate and the independent variable is irrelevant.
-#It’s a design assumption. It’s not a model assumption.
-#The only effect of the assumption of the independent variable and the covariate being independent is in how you interpret the results.
-
-#The appropriate response is #2–keep the covariate in the analysis, but explain it well
-#It doesn’t mean I can’t run the model at all, it just means I need to include 
-#covariate in my model and explain the model with that in it. 
-#The categorical variable effect on x was observed not manipulated in my case
-#and don’t interpret results from an observational study as if they were manipulated
-
 #ASSUMPTION 2
-#Homogeneity of slopes, but also running the ancova
+#Homogeneity of slopes
 #The slopes of the regression lines should be the same for each group. 
 #This assumption checks that there is no significant interaction between the covariate and the grouping variable.
 #The plotted regression lines by groups should be parallel.
 
-#RUNNING ANCOVA (calling it a general linear model because 
-#assumption of covariate and grouping not interactions not met)
-
-#For ANCOVA, need to look at type I because the first variable is continuous??
-#Use type 1 because there is an interaction between categorical variable and predictor variable
-#Type I: 
-#Balanced data, sequential (first variable considered, then the next for error)
-#Type 2: Unbalanced data, principle of marginality, does not consider interactions. 
-#Don't use if interactions are present. If no interaction, more powerful than type 3. 
-#Type 3: Unbalanced data, use when sig. interactions, you have to make orthogonal contrasts?
-
-# Type I ANOVA - aov()
-#aov defaults to type I
-#aov(time.lm)
-
-# Type II ANOVA - Anova(type = 2)
-#car::Anova(time.lm, type = 2)
-
-# Type III ANOVA - Anova(type = 3)
-#car::Anova(time.lm, type = 3)
-
-#The * indicates an interaction
-#If no interaction, put + to take it out
-#covariate first
-
-model <- aov(y ~ x*Type, data=ANCOVA_data)
-summary(model)
-
-model_no.outliers <- aov(y ~ x*Type, data=ANCOVA_data.no.outliers)
-summary(model_no.outliers)
-
-AIC(model, model_no.outliers)
-#no outlier is a better model
-
-#after adjusting for covariate, if p<0.05, there is a significant difference in 
-#dependent variable between groups
-#Interaction term is significant, slopes are not parallel.
-#slopes are statistically different from each other
-#this is the answer, saying that they are different. Keep interaction in model 
-
 #Pairwise comparisons
 #which groups are different
 #Emmeans stands for estimated marginal means (aka least square means or adjusted means).
+#Estimated Marginal Means adjust for the covariate by reporting the means of Y 
+#for each level of the factor at the mean value of the covariate.
+
 library(emmeans)
-pwc <- ANCOVA_data%>% 
+pwc <- combined.11.ol%>% 
   emmeans_test(
     y ~ Type, covariate = x,
     p.adjust.method = "bonferroni"
   )
 pwc
 
-pwc.no.outliers <- ANCOVA_data.no.outliers%>% 
-  emmeans_test(
-    y ~ Type, covariate = x,
-    p.adjust.method = "bonferroni"
-  )
-pwc.no.outliers
-
-#each group comparison of slope is statistically different from each other
+# each group comparison of slope is statistically different from each other
 # Display the adjusted means of each group 
 # Also called as the estimated marginal means (emmeans)
 get_emmeans(pwc)
-get_emmeans(pwc.no.outliers)
 #elevation significantly different from each other
 
 #ASSUMPTION 3
@@ -218,70 +251,54 @@ get_emmeans(pwc.no.outliers)
 #The outcome variable should be approximately normally distributed. 
 #This can be checked using the Shapiro-Wilk test of normality on the model residuals.
 
-# Fit the model, the covariate goes first
-#The orders of variables matters when computing ANCOVA. 
-#You want to remove the effect of the covariate first - 
-#that is, you want to control for it - prior to entering your main variable or interest.
-
-model <- lm(y ~ x + Type, data = ANCOVA_data)
 # Inspect the model diagnostic metrics
 model.metrics <- augment(model)
 # Assess normality of residuals using shapiro wilk test
 shapiro_test(model.metrics$.resid)
 #>0.05, normal data 
 
-model.no.outliers <- lm(y ~ x + Type, data = ANCOVA_data.no.outliers)
-model.metrics.no.outliers <- augment(model.no.outliers)
-# Assess normality of residuals using shapiro wilk test
-shapiro_test(model.metrics.no.outliers$.resid)
-
 #ASSUMPTION 4
 #Homogeneity of variances (aka homoscedasticity)
 #ANCOVA assumes that the variance of the residuals is equal for all groups. 
 #This can be checked using the Levene’s test
 model.metrics %>% levene_test(.resid ~ Type)
-model.metrics.no.outliers %>% levene_test(.resid ~ Type)
-
 #The Levene’s test was not significant (p > 0.05)
 #assume homogeneity of the residual variances for all groups.
 
-#outliers
-#About cooks distance: commonly used estimate of the influence of a data point 
-#when performing a least-squares regression analysis.
-#defined as the sum of all the changes in the regression model when observation i is removed from it. 
-
-#Determined within the model as a whole, not with each line
-#Outliers can be identified by examining the standardized residual (or studentized residual), 
-#which is the residual divided by its estimated standard error. 
-#Standardized residuals can be interpreted as the number of standard errors 
-#away from the regression line.
-
-Outlier <- model.metrics %>% 
-  filter(abs(.std.resid) > 3) %>% #tells you which is an outlier, but if want to see all data, don't filter
-  as.data.frame()
-
-cooks <- cooks.distance(model)
-cooks
-plot(cooks)
 
 
 
-#Reason & which were outliers:
-#y,x outliers
 
-#Observations whose standardized residuals are greater than 3 in absolute value are possible outliers.
-#0.4639831, 0.7403627, Porites_juvenile #ID: 11
 
-#Visually
-#0.4639831, 0.7403627, Porites_juvenile #ID: 11
-#-0.3381778, 0.3222193, Porites_juvenile #ID: 20
 
-#4/N( N= # of observations, K= # of explanatory variables)
-#4/38 = 0.10
-#0.4639831, 0.7403627, Porites_juvenile #ID: 11
-#-0.3381778, 0.3222193, Porites_juvenile #ID: 20
-#0.2345787, 0.7634280, Pocillopora_juvenile #ID: 23
-#I additionally took out the highest cooks distance outlier, then took out 2, then 3
-#AIC model was lowest only when 1 outlier was removed (as opposed to 2 or 3)
+
+
+
+#For me
+#s = sums, s2p = squares and products
+#pocl=poc larvae, pocj = poc juv, portj = port juv
+#o=overall
+x.o.s <- sum(x)
+x.o.s2p <- sum(x^2)
+y.o.s <- sum(y)
+y.o.s2p <- sum(y^2)
+xy.o.s2p <- sum(x*y)
+x.pocl.s <- sum(x[Type=="Pocillopora_larvae"])
+x.pocl.s2p <- sum(x[Type=="Pocillopora_larvae"]^2)
+x.pocj.s <- sum(x[Type=="Pocillopora_juvenile"])
+x.poc.j.s2p <- sum(x[Type=="Pocillopora_juvenile"]^2)
+x.portj.s <- sum(x[Type=="Porites_juvenile"])
+x.portj.s2p <- sum(x[Type=="Porites_juvenile"]^2)
+y.pocl.s <- sum(y[Type=="Pocillopora_larvae"])
+y.pocl.s2p <- sum(y[Type=="Pocillopora_larvae"]^2)
+y.pocj.s <- sum(y[Type=="Pocillopora_juvenile"])
+y.pocj.s2p <- sum(y[Type=="Pocillopora_juvenile"]^2)
+y.portj.s <- sum(y[Type=="Porites_juvenile"])
+y.portj.s2p <- sum(y[Type=="Porites_juvenile"]^2)
+#sums of products
+xy.pocl.s2p <- sum(x[Type=="Pocillopora_larvae"]*y[Type=="Pocillopora_larvae"])
+xy.pocj.s2p <- sum(x[Type=="Pocillopora_juvenile"]*y[Type=="Pocillopora_juvenile"])
+xy.portj.s2p <- sum(x[Type=="Porites_juvenile"]*y[Type=="Porites_juvenile"])
+
 
 
